@@ -28,8 +28,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             KaptalTheme {
+                var isLoggedIn by remember { mutableStateOf(false) }
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LoginScreen(modifier = Modifier.padding(innerPadding))
+                    if (!isLoggedIn) {
+                        LoginScreen(
+                            modifier = Modifier.padding(innerPadding),
+                            onLoginSuccess = { isLoggedIn = true }
+                        )
+                    } else {
+                        AddAccountScreen(
+                            onAccountAdded = { name, inst, balance, curr, type ->
+                                Toast.makeText(
+                                    this,
+                                    "Compte $name créé avec un solde de $balance $curr",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -37,7 +54,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun LoginScreen(modifier: Modifier = Modifier) {
+fun LoginScreen(
+    modifier: Modifier = Modifier,
+    onLoginSuccess: () -> Unit
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -103,13 +123,16 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.clickable {
-                    if (email.isNotEmpty()) {
-                        auth.sendPasswordResetEmail(email)
-                            .addOnSuccessListener {
-                                Toast.makeText(context, "E-mail de réinitialisation envoyé !", Toast.LENGTH_LONG).show()
-                            }
-                            .addOnFailureListener { e ->
-                                Toast.makeText(context, "Erreur : ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                    val cleanEmail = email.trim()
+                    if (cleanEmail.isNotEmpty()) {
+                        auth.sendPasswordResetEmail(cleanEmail)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    Toast.makeText(context, "E-mail de réinitialisation envoyé à $cleanEmail !", Toast.LENGTH_LONG).show()
+                                } else {
+                                    val errorMsg = task.exception?.localizedMessage ?: "Erreur inconnue"
+                                    Toast.makeText(context, "Erreur : $errorMsg", Toast.LENGTH_LONG).show()
+                                }
                             }
                     } else {
                         Toast.makeText(context, "Veuillez entrer votre adresse e-mail d'abord.", Toast.LENGTH_SHORT).show()
@@ -132,6 +155,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                             .addOnSuccessListener {
                                 isLoading = false
                                 Toast.makeText(context, "Connexion réussie !", Toast.LENGTH_SHORT).show()
+                                onLoginSuccess()
                             }
                             .addOnFailureListener { e ->
                                 isLoading = false
@@ -159,6 +183,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                             .addOnSuccessListener {
                                 isLoading = false
                                 Toast.makeText(context, "Compte créé avec succès !", Toast.LENGTH_SHORT).show()
+                                onLoginSuccess()
                             }
                             .addOnFailureListener { e ->
                                 isLoading = false
@@ -175,13 +200,5 @@ fun LoginScreen(modifier: Modifier = Modifier) {
                 Text(text = "Créer un compte", fontSize = 16.sp)
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    KaptalTheme {
-        LoginScreen()
     }
 }
