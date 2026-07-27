@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Thème principal -->
     <style name="Theme.Kaptal" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Thème du Splash Screen -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <!-- Icône temporaire du système pour tester -->
+        <item name="windowSplashScreenAnimatedIcon">@android:drawable/ic_dialog_info</item>
+        <item name="postSplashScreenTheme">@style/Theme.Kaptal</item>
+    </style>
+
 </resources>
