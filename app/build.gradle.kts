@@ -67,4 +67,7 @@ dependencies {
 
     // Icônes Material (nécessaire pour Icons.Default.Settings / Add)
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Pour l'authentification Biométrique (Empreinte / Visage)
+    implementation("androidx.biometric:biometric:1.1.0")
 }

@@ -48,14 +48,31 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
+                    var currentScreen by remember { mutableStateOf("home") } // "home" ou "settings"
+                    var accounts by remember { mutableStateOf(listOf<Account>()) }
 
                     if (isLoggedIn) {
-                        HomeScreen(
-                            onLogout = {
-                                auth.signOut()
-                                isLoggedIn = false
-                            }
-                        )
+                        if (currentScreen == "settings") {
+                            // Écran complet des paramètres
+                            SettingsScreen(
+                                auth = auth,
+                                accounts = accounts,
+                                onBackClick = { currentScreen = "home" },
+                                onLogout = {
+                                    auth.signOut()
+                                    isLoggedIn = false
+                                }
+                            )
+                        } else {
+                            // Écran principal avec la liste des comptes
+                            HomeScreen(
+                                accounts = accounts,
+                                onAccountAdded = { newAccount ->
+                                    accounts = accounts + newAccount
+                                },
+                                onOpenSettings = { currentScreen = "settings" }
+                            )
+                        }
                     } else {
                         LoginScreen(
                             auth = auth,
@@ -84,9 +101,6 @@ fun LoginScreen(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Logo géométrique dessiné en arrière-plan
-        KaptalGeometricLogo(isBackgroundMode = true)
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -234,21 +248,22 @@ fun LoginScreen(
     }
 }
 
-// --- ÉCRAN PRINCIPAL AVEC PARAMÈTRES ET BOUTON + ---
+// --- ÉCRAN PRINCIPAL DE L'APPLICATION ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onLogout: () -> Unit) {
-    var accounts by remember { mutableStateOf(listOf<Account>()) }
-
+fun HomeScreen(
+    accounts: List<Account>,
+    onAccountAdded: (Account) -> Unit,
+    onOpenSettings: () -> Unit
+) {
     var showAddAccountDialog by remember { mutableStateOf(false) }
-    var showSettingsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Kaptal", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { showSettingsDialog = true }) {
+                    IconButton(onClick = onOpenSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Paramètres"
@@ -305,30 +320,19 @@ fun HomeScreen(onLogout: () -> Unit) {
         }
     }
 
-    // Modal Création de compte
+    // Modal de création de compte
     if (showAddAccountDialog) {
         AddAccountDialog(
             onDismiss = { showAddAccountDialog = false },
             onAccountCreated = { newAccount ->
-                accounts = accounts + newAccount
+                onAccountAdded(newAccount)
                 showAddAccountDialog = false
-            }
-        )
-    }
-
-    // Modal Paramètres
-    if (showSettingsDialog) {
-        SettingsDialog(
-            onDismiss = { showSettingsDialog = false },
-            onLogout = {
-                showSettingsDialog = false
-                onLogout()
             }
         )
     }
 }
 
-// Composant pour l'affichage d'un compte
+// Carte visuelle pour un compte
 @Composable
 fun AccountItemCard(account: Account) {
     Card(
@@ -359,7 +363,7 @@ fun AccountItemCard(account: Account) {
     }
 }
 
-// Dialog Ajouter un compte
+// Dialogue d'ajout de compte
 @Composable
 fun AddAccountDialog(
     onDismiss: () -> Unit,
@@ -405,41 +409,6 @@ fun AddAccountDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Annuler")
-            }
-        }
-    )
-}
-
-// Dialog Paramètres
-@Composable
-fun SettingsDialog(
-    onDismiss: () -> Unit,
-    onLogout: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Paramètres") },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text("Version de l'application : 1.0.0")
-                HorizontalDivider()
-                Button(
-                    onClick = onLogout,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Se déconnecter")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Fermer")
             }
         }
     )
