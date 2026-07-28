@@ -64,4 +64,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // Icônes Material (nécessaire pour Icons.Default.Settings / Add)
+    implementation("androidx.compose.material:material-icons-extended")
 }
