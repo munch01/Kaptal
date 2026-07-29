@@ -209,14 +209,14 @@ fun SettingsScreen(
                 title = "Code Source (GitHub)",
                 subtitle = "Projet Open Source disponible sur GitHub",
                 onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Emeric16/Kaptal"))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal"))
                     context.startActivity(intent)
                 }
             )
         }
     }
 
-    // --- DIALOGUE 1 : CHANGER EMAIL ---
+    // --- DIALOGUES ---
     if (showEmailDialog) {
         AlertDialog(
             onDismissRequest = { showEmailDialog = false },
@@ -267,7 +267,6 @@ fun SettingsScreen(
         )
     }
 
-    // --- DIALOGUE 2 : RÉINITIALISATION DU MOT DE PASSE ---
     if (showPasswordDialog) {
         AlertDialog(
             onDismissRequest = { showPasswordDialog = false },
@@ -307,7 +306,6 @@ fun SettingsScreen(
         )
     }
 
-    // --- DIALOGUE 3 : SUPPRESSION DU COMPTE ---
     if (showDeleteAccountDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAccountDialog = false },
@@ -352,7 +350,6 @@ fun SettingsScreen(
         )
     }
 
-    // --- DIALOGUE 4 : SÉLECTION DE LA LANGUE ---
     if (showLanguageDialog) {
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
@@ -396,7 +393,6 @@ fun SettingsScreen(
         )
     }
 
-    // --- DIALOGUE 5 : À PROPOS ---
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
