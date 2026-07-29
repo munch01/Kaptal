@@ -60,8 +60,8 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
 
-    // --- Biométrie ---
-    implementation("androidx.biometric:biometric:1.1.0")
+       // Biométrie Android
+    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
 
     // --- Tests & Debug ---
     testImplementation(libs.junit)
