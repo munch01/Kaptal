@@ -38,7 +38,6 @@ fun AuthScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // En-tête de l'application
         Text(
             text = "Kaptal",
             fontSize = 36.sp,
@@ -57,7 +56,6 @@ fun AuthScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Champ Adresse Email (Corrigé avec KeyboardType.Email)
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -70,7 +68,6 @@ fun AuthScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Champ Mot de passe
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -84,7 +81,6 @@ fun AuthScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Bouton de Validation
         Button(
             onClick = {
                 if (email.isBlank() || password.isBlank()) {
@@ -129,7 +125,6 @@ fun AuthScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Basculer entre Connexion et Inscription
         TextButton(onClick = { isSignUp = !isSignUp }) {
             Text(
                 if (isSignUp) "Déjà un compte ? Se connecter" else "Pas de compte ? S'inscrire"
