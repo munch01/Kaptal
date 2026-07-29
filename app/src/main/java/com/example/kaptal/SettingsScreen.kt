@@ -1,6 +1,5 @@
 package com.example.kaptal
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -10,18 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.CurrencyExchange
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,30 +18,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.google.firebase.auth.FirebaseAuth
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val auth = FirebaseAuth.getInstance()
-    val currentUser = auth.currentUser
-
-    // --- SAUVEGARDE LOCALE (SharedPreferences) ---
-    val prefs = remember { context.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE) }
-
-    // États persistants
-    var isBiometricEnabled by remember {
-        mutableStateOf(prefs.getBoolean("biometric_enabled", false))
-    }
-    var selectedCurrency by remember {
-        mutableStateOf(prefs.getString("selected_currency", "EUR (€)") ?: "EUR (€)")
-    }
-    var selectedLanguage by remember {
-        mutableStateOf(prefs.getString("selected_language", "Français") ?: "Français")
-    }
+    val currentUser = viewModel.currentUser
 
     // Dialogues
     var showEmailDialog by remember { mutableStateOf(false) }
@@ -72,10 +46,7 @@ fun SettingsScreen(
                 title = { Text("Paramètres", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Retour"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -108,9 +79,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -147,7 +116,7 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // ================= 2. SÉCURITÉ & BIOMÉTRIE =================
+            // ================= 2. SÉCURITÉ =================
             Text(
                 text = "Sécurité",
                 style = MaterialTheme.typography.titleMedium,
@@ -161,9 +130,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -172,30 +139,17 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Fingerprint,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Column {
-                                Text(
-                                    text = "Verrouillage biométrique",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Demander l'empreinte à l'ouverture",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Text("Verrouillage biométrique", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text("Demander l'empreinte à l'ouverture", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
 
                         Switch(
-                            checked = isBiometricEnabled,
+                            checked = viewModel.isBiometricEnabled,
                             onCheckedChange = { checked ->
-                                isBiometricEnabled = checked
-                                prefs.edit().putBoolean("biometric_enabled", checked).apply()
+                                viewModel.updateBiometric(checked)
                             }
                         )
                     }
@@ -207,14 +161,8 @@ fun SettingsScreen(
                         title = "Mot de passe",
                         subtitle = "Envoyer un e-mail de réinitialisation",
                         onClick = {
-                            currentUser?.email?.let { email ->
-                                auth.sendPasswordResetEmail(email)
-                                    .addOnSuccessListener {
-                                        Toast.makeText(context, "Un e-mail de réinitialisation a été envoyé à $email", Toast.LENGTH_LONG).show()
-                                    }
-                                    .addOnFailureListener {
-                                        Toast.makeText(context, "Erreur : ${it.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                    }
+                            viewModel.sendPasswordResetEmail { success, message ->
+                                Toast.makeText(context, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
@@ -239,7 +187,7 @@ fun SettingsScreen(
                     SettingsClickableItem(
                         icon = Icons.Default.CurrencyExchange,
                         title = "Devise principale",
-                        subtitle = selectedCurrency,
+                        subtitle = viewModel.selectedCurrency,
                         onClick = { showCurrencyDialog = true }
                     )
 
@@ -248,7 +196,7 @@ fun SettingsScreen(
                     SettingsClickableItem(
                         icon = Icons.Default.Language,
                         title = "Langue de l'application",
-                        subtitle = selectedLanguage,
+                        subtitle = viewModel.selectedLanguage,
                         onClick = { showLanguageDialog = true }
                     )
                 }
@@ -275,10 +223,7 @@ fun SettingsScreen(
                         subtitle = "Consulter le code source",
                         trailingIcon = Icons.Default.OpenInNew,
                         onClick = {
-                            val intent = Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com")
-                            )
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com"))
                             context.startActivity(intent)
                         }
                     )
@@ -299,7 +244,7 @@ fun SettingsScreen(
             // ================= 5. DÉCONNEXION & SUPPRESSION =================
             OutlinedButton(
                 onClick = {
-                    auth.signOut()
+                    viewModel.signOut()
                     onBackClick()
                 },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -322,7 +267,7 @@ fun SettingsScreen(
         }
     }
 
-    // --- DIALOGUE DE SÉLECTION DE LA DEVISE ---
+    // --- DIALOGUES ---
     if (showCurrencyDialog) {
         AlertDialog(
             onDismissRequest = { showCurrencyDialog = false },
@@ -334,18 +279,16 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    selectedCurrency = curr
-                                    prefs.edit().putString("selected_currency", curr).apply()
+                                    viewModel.updateCurrency(curr)
                                     showCurrencyDialog = false
                                 }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = (curr == selectedCurrency),
+                                selected = (curr == viewModel.selectedCurrency),
                                 onClick = {
-                                    selectedCurrency = curr
-                                    prefs.edit().putString("selected_currency", curr).apply()
+                                    viewModel.updateCurrency(curr)
                                     showCurrencyDialog = false
                                 }
                             )
@@ -356,15 +299,10 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showCurrencyDialog = false }) {
-                    Text("Annuler")
-                }
-            }
+            dismissButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text("Annuler") } }
         )
     }
 
-    // --- DIALOGUE DE SÉLECTION DE LA LANGUE ---
     if (showLanguageDialog) {
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
@@ -376,18 +314,16 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    selectedLanguage = lang
-                                    prefs.edit().putString("selected_language", lang).apply()
+                                    viewModel.updateLanguage(lang)
                                     showLanguageDialog = false
                                 }
                                 .padding(vertical = 12.dp, horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = (lang == selectedLanguage),
+                                selected = (lang == viewModel.selectedLanguage),
                                 onClick = {
-                                    selectedLanguage = lang
-                                    prefs.edit().putString("selected_language", lang).apply()
+                                    viewModel.updateLanguage(lang)
                                     showLanguageDialog = false
                                 }
                             )
@@ -398,15 +334,10 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text("Annuler")
-                }
-            }
+            dismissButton = { TextButton(onClick = { showLanguageDialog = false }) { Text("Annuler") } }
         )
     }
 
-    // --- DIALOGUE DE CHANGEMENT D'EMAIL ---
     if (showEmailDialog) {
         AlertDialog(
             onDismissRequest = { showEmailDialog = false },
@@ -427,28 +358,17 @@ fun SettingsScreen(
                 Button(
                     enabled = newEmailText.isNotBlank(),
                     onClick = {
-                        currentUser?.verifyBeforeUpdateEmail(newEmailText.trim())
-                            ?.addOnSuccessListener {
-                                Toast.makeText(context, "E-mail de vérification envoyé à $newEmailText", Toast.LENGTH_LONG).show()
-                                showEmailDialog = false
-                            }
-                            ?.addOnFailureListener { err ->
-                                Toast.makeText(context, "Erreur : ${err.localizedMessage}", Toast.LENGTH_LONG).show()
-                            }
+                        viewModel.updateEmail(newEmailText) { _, msg ->
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            showEmailDialog = false
+                        }
                     }
-                ) {
-                    Text("Mettre à jour")
-                }
+                ) { Text("Mettre à jour") }
             },
-            dismissButton = {
-                TextButton(onClick = { showEmailDialog = false }) {
-                    Text("Annuler")
-                }
-            }
+            dismissButton = { TextButton(onClick = { showEmailDialog = false }) { Text("Annuler") } }
         )
     }
 
-    // --- DIALOGUE À PROPOS ---
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
@@ -459,51 +379,35 @@ fun SettingsScreen(
                     Text("Application de gestion financière personnelle.")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Version : 1.0.0", fontWeight = FontWeight.Bold)
-                    Text("Développé avec Jetpack Compose & Firebase.")
+                    Text("Architecture MVVM avec Jetpack Compose & Firebase.")
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showAboutDialog = false }) {
-                    Text("Fermer")
-                }
-            }
+            confirmButton = { TextButton(onClick = { showAboutDialog = false }) { Text("Fermer") } }
         )
     }
 
-    // --- DIALOGUE DE SUPPRESSION DE COMPTE ---
     if (showDeleteAccountDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAccountDialog = false },
             title = { Text("Supprimer définitivement le compte ?") },
-            text = { Text("Cette action est irréversible. Toutes vos données seront définitivement effacées.") },
+            text = { Text("Cette action est irréversible. Toutes vos données seront effacées.") },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     onClick = {
-                        currentUser?.delete()
-                            ?.addOnSuccessListener {
-                                Toast.makeText(context, "Compte supprimé avec succès", Toast.LENGTH_SHORT).show()
-                                showDeleteAccountDialog = false
-                                onBackClick()
-                            }
-                            ?.addOnFailureListener { err ->
-                                Toast.makeText(context, "Erreur : ${err.localizedMessage}", Toast.LENGTH_LONG).show()
-                            }
+                        viewModel.deleteAccount { success, msg ->
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            showDeleteAccountDialog = false
+                            if (success) onBackClick()
+                        }
                     }
-                ) {
-                    Text("Confirmer la suppression")
-                }
+                ) { Text("Confirmer la suppression") }
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteAccountDialog = false }) {
-                    Text("Annuler")
-                }
-            }
+            dismissButton = { TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Annuler") } }
         )
     }
 }
 
-// --- COMPOSANT DE LIGNE RÉUTILISABLE ---
 @Composable
 private fun SettingsClickableItem(
     icon: ImageVector,
