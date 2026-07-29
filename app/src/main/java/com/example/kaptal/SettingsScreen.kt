@@ -29,7 +29,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.example.kaptal.data.FirestoreRepository
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 private const val PREFS_NAME = "kaptal_settings_prefs"
 private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
@@ -43,13 +45,13 @@ fun SettingsScreen(
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val currentUser = auth.currentUser
+    val coroutineScope = rememberCoroutineScope()
+    val firestoreRepository = remember { FirestoreRepository() }
 
-    // Instanciation de SharedPreferences
     val sharedPreferences = remember {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    // États locaux
     var biometricEnabled by remember {
         mutableStateOf(sharedPreferences.getBoolean(KEY_BIOMETRIC_ENABLED, false))
     }
@@ -57,7 +59,6 @@ fun SettingsScreen(
         mutableStateOf(sharedPreferences.getString(KEY_SELECTED_LANGUAGE, "Français") ?: "Français")
     }
 
-    // Dialogues
     var showEmailDialog by remember { mutableStateOf(false) }
     var newEmail by remember { mutableStateOf("") }
     var isLoadingEmail by remember { mutableStateOf(false) }
@@ -73,7 +74,6 @@ fun SettingsScreen(
 
     val languages = listOf("Français", "English", "Español")
 
-    // Authentification biométrique pour activation
     fun authenticateBiometric(onSuccess: () -> Unit) {
         val biometricManager = BiometricManager.from(context)
         val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -175,7 +175,7 @@ fun SettingsScreen(
             SettingItem(
                 icon = Icons.Default.DeleteForever,
                 title = "Supprimer le compte",
-                subtitle = "Supprimer définitivement votre compte Kaptal",
+                subtitle = "Supprimer définitivement votre compte et vos données",
                 textColor = MaterialTheme.colorScheme.error,
                 onClick = { showDeleteAccountDialog = true }
             )
@@ -306,12 +306,13 @@ fun SettingsScreen(
         )
     }
 
+    // --- DIALOGUE DE SUPPRESSION DE COMPTE (RGPD COMPLIANT) ---
     if (showDeleteAccountDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteAccountDialog = false },
+            onDismissRequest = { if (!isLoadingDelete) showDeleteAccountDialog = false },
             title = { Text("Supprimer le compte ?") },
             text = {
-                Text("Cette action est irréversible. Toutes vos données seront définitivement effacées de Firebase.")
+                Text("Cette action est irréversible. Conformément au RGPD, toutes vos données (comptes, transactions) seront définitivement effacées des serveurs.")
             },
             confirmButton = {
                 Button(
@@ -319,20 +320,35 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     onClick = {
                         isLoadingDelete = true
-                        currentUser?.delete()
-                            ?.addOnCompleteListener { task ->
+                        coroutineScope.launch {
+                            // 1. Suppression préalable des données Firestore
+                            val deleteFirestoreResult = firestoreRepository.deleteAllUserData()
+
+                            if (deleteFirestoreResult.isSuccess) {
+                                // 2. Suppression de l'utilisateur Firebase Auth
+                                currentUser?.delete()
+                                    ?.addOnCompleteListener { task ->
+                                        isLoadingDelete = false
+                                        showDeleteAccountDialog = false
+                                        if (task.isSuccessful) {
+                                            Toast.makeText(context, "Compte et données supprimés avec succès", Toast.LENGTH_LONG).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Données supprimées, mais échec de suppression du compte (reconnexion requise) : ${task.exception?.message}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                            } else {
                                 isLoadingDelete = false
-                                showDeleteAccountDialog = false
-                                if (task.isSuccessful) {
-                                    Toast.makeText(context, "Compte supprimé avec succès", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Erreur (reconnexion requise) : ${task.exception?.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
+                                Toast.makeText(
+                                    context,
+                                    "Erreur lors de la suppression des données : ${deleteFirestoreResult.exceptionOrNull()?.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
+                        }
                     }
                 ) {
                     if (isLoadingDelete) {
@@ -343,7 +359,10 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                TextButton(
+                    enabled = !isLoadingDelete,
+                    onClick = { showDeleteAccountDialog = false }
+                ) {
                     Text("Annuler")
                 }
             }
