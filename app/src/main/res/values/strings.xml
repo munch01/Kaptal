@@ -1,3 +1,36 @@
 <resources>
     <string name="app_name">Kaptal</string>
+
+    <!-- Navigation & Paramètres Général -->
+    <string name="settings_title">Paramètres</string>
+    <string name="back">Retour</string>
+    <string name="logout">Se déconnecter</string>
+
+    <!-- Section Sécurité -->
+    <string name="section_security">Sécurité</string>
+    <string name="biometric_title">Déverrouillage biométrique</string>
+    <string name="biometric_subtitle">Utiliser l\'empreinte ou le visage</string>
+    <string name="pin_title">Code PIN à 4 chiffres</string>
+    <string name="pin_configured">Code PIN configuré</string>
+    <string name="pin_not_configured">Non configuré</string>
+    <string name="pin_dialog_title">Définir un code PIN</string>
+    <string name="pin_input_label">Code à 4 chiffres</string>
+    <string name="validate">Valider</string>
+    <string name="cancel">Annuler</string>
+    <string name="pin_saved">Code PIN enregistré</string>
+    <string name="pin_error">Le PIN doit contenir 4 chiffres</string>
+
+    <!-- Section Préférences -->
+    <string name="section_preferences">Préférences</string>
+    <string name="currency_label">Devise principale</string>
+    <string name="language_label">Langue de l\'application</string>
+
+    <!-- Section Compte -->
+    <string name="section_account">Compte Firebase</string>
+    <string name="change_email">Changer d\'adresse e-mail</string>
+
+    <!-- Section Sauvegarde -->
+    <string name="section_backup">Données &amp; Sauvegarde</string>
+    <string name="export_csv">Export CSV</string>
+    <string name="export_json">Export JSON</string>
 </resources>

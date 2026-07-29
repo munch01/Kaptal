@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.kaptal"
-    compileSdk = 35 // Syntaxe standard et stable
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.kaptal"
@@ -27,36 +27,43 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
-    // Core & Lifecycle
+
+    // --- Core & Lifecycle ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
 
-    // Jetpack Compose
+    // --- Jetpack Compose ---
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material:material-icons-extended")
 
-    // Splash Screen API
-    implementation("androidx.core:core-splashscreen:1.0.1")
-
-    // Firebase
+    // --- Firebase ---
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
 
-    // Tests
+    // --- Biométrie ---
+    implementation("androidx.biometric:biometric:1.1.0")
+
+    // --- Tests & Debug ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -64,10 +71,4 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-
-    // Icônes Material (nécessaire pour Icons.Default.Settings / Add)
-    implementation("androidx.compose.material:material-icons-extended")
-
-    // Pour l'authentification Biométrique (Empreinte / Visage)
-    implementation("androidx.biometric:biometric:1.1.0")
 }
