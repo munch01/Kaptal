@@ -1,0 +1,22 @@
+{
+  "project_info": {
+    "project_number": "1",
+    "project_id": "kaptal-app-example",
+    "storage_bucket": "kaptal-app-example.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1234567890:android:abcdef123456",
+        "android_client_info": {
+          "package_name": "com.example.kaptal"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyEXAMPLE_KEY_DO_NOT_USE"
+        }
+      ]
+    }
+  ]
+}
