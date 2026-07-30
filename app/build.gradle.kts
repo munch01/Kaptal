@@ -62,8 +62,7 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
 
        // Biométrie Android
-    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
-
+    implementation("androidx.biometric:biometric:1.1.0")
     // --- Tests & Debug ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
