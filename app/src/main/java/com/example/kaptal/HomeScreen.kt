@@ -1,6 +1,8 @@
 package com.example.kaptal
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,7 +11,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +21,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,7 +37,10 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+
+    // Gestion des dialogues (Ajout vs Édition)
     var showAddDialog by remember { mutableStateOf(false) }
+    var accountToEdit by remember { mutableStateOf<Account?>(null) }
     var accountToDelete by remember { mutableStateOf<Account?>(null) }
 
     Scaffold(
@@ -41,7 +49,6 @@ fun HomeScreen(
                 title = { Text("Mes Comptes", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        // Ferme l'application
                         (context as? Activity)?.finish()
                     }) {
                         Icon(
@@ -51,6 +58,16 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/issues"))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Feedback,
+                            contentDescription = "Signaler un bug / Amélioration"
+                        )
+                    }
+
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
@@ -140,6 +157,7 @@ fun HomeScreen(
                             ) { account ->
                                 AccountCard(
                                     account = account,
+                                    onEditClick = { accountToEdit = account },
                                     onDeleteClick = { accountToDelete = account }
                                 )
                             }
@@ -152,11 +170,27 @@ fun HomeScreen(
 
     // --- DIALOGUE D'AJOUT DE COMPTE ---
     if (showAddDialog) {
-        AddAccountDialog(
+        AccountFormDialog(
+            title = "Ajouter un compte bancaire",
+            initialAccount = null,
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, balance, type ->
-                viewModel.addAccount(name, balance, type) {
+            onConfirm = { name, bankName, initialBalance, type, isJoint ->
+                viewModel.addAccount(name, bankName, initialBalance, type, isJoint) {
                     showAddDialog = false
+                }
+            }
+        )
+    }
+
+    // --- DIALOGUE DE MODIFICATION DE COMPTE ---
+    accountToEdit?.let { account ->
+        AccountFormDialog(
+            title = "Modifier le compte",
+            initialAccount = account,
+            onDismiss = { accountToEdit = null },
+            onConfirm = { name, bankName, initialBalance, type, isJoint ->
+                viewModel.updateAccount(account.id, name, bankName, initialBalance, type, isJoint) {
+                    accountToEdit = null
                 }
             }
         )
@@ -191,6 +225,7 @@ fun HomeScreen(
 @Composable
 fun AccountCard(
     account: Account,
+    onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -215,24 +250,60 @@ fun AccountCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = when (account.type) {
-                        "SAVINGS" -> "Épargne"
-                        else -> "Compte Courant"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (account.bankName.isNotBlank()) {
+                    Text(
+                        text = account.bankName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = when (account.type) {
+                            "SAVINGS" -> "Épargne"
+                            "JOINT" -> "Compte Joint"
+                            else -> "Compte Courant"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (account.isJoint) {
+                        Text(
+                            text = "• Partagé",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Couleur dynamique : Vert si positif ou nul, Rouge si négatif
+                val balanceColor = if (account.initialBalance >= 0) {
+                    Color(0xFF2E7D32) // Vert foncé lisible
+                } else {
+                    MaterialTheme.colorScheme.error // Rouge des thèmes Material
+                }
+
                 Text(
                     text = String.format("%.2f %s", account.initialBalance, account.currency),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = balanceColor
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Bouton Éditer
+                IconButton(onClick = onEditClick) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Modifier le compte",
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                    )
+                }
+
+                // Bouton Supprimer
                 IconButton(onClick = onDeleteClick) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -246,24 +317,37 @@ fun AccountCard(
 }
 
 @Composable
-fun AddAccountDialog(
+fun AccountFormDialog(
+    title: String,
+    initialAccount: Account?,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, balance: Double, type: String) -> Unit
+    onConfirm: (name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean) -> Unit
 ) {
-    var accountName by remember { mutableStateOf("") }
-    var initialBalanceText by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf("CHECKING") }
+    var accountName by remember { mutableStateOf(initialAccount?.name ?: "") }
+    var bankName by remember { mutableStateOf(initialAccount?.bankName ?: "") }
+    var initialBalanceText by remember { mutableStateOf(initialAccount?.initialBalance?.toString() ?: "") }
+    var selectedType by remember { mutableStateOf(initialAccount?.type ?: "CHECKING") }
+    var isJoint by remember { mutableStateOf(initialAccount?.isJoint ?: false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ajouter un compte bancaire") },
+        title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = accountName,
                     onValueChange = { accountName = it },
                     label = { Text("Nom du compte") },
-                    placeholder = { Text("Ex: Compte Courant, Livret A...") },
+                    placeholder = { Text("Ex: Compte Perso, Livret A...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = bankName,
+                    onValueChange = { bankName = it },
+                    label = { Text("Établissement bancaire") },
+                    placeholder = { Text("Ex: Crédit Agricole, BoursoBank...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -277,6 +361,8 @@ fun AddAccountDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // Choix du type de compte
+                Text("Type de compte", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -292,17 +378,30 @@ fun AddAccountDialog(
                         label = { Text("Épargne") }
                     )
                 }
+
+                // Case à cocher Compte Joint / Partagé
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isJoint,
+                        onCheckedChange = { isJoint = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Compte partagé / joint")
+                }
             }
         },
         confirmButton = {
             Button(
                 enabled = accountName.isNotBlank() && initialBalanceText.toDoubleOrNull() != null,
                 onClick = {
-                    val balance = initialBalanceText.toDoubleOrNull() ?: 0.0
-                    onConfirm(accountName.trim(), balance, selectedType)
+                    val initialBalance = initialBalanceText.toDoubleOrNull() ?: 0.0
+                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint)
                 }
             ) {
-                Text("Ajouter")
+                Text("Enregistrer")
             }
         },
         dismissButton = {

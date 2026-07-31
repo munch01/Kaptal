@@ -45,7 +45,9 @@ class FirestoreRepository {
                 .get()
                 .await()
 
-            val accounts = snapshot.toObjects(Account::class.java)
+            val accounts = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(Account::class.java)?.copy(id = doc.id)
+            }
             Result.success(accounts)
         } catch (e: Exception) {
             Result.failure(e)

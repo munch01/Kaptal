@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -204,9 +206,9 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // ================= 4. DÉVELOPPEMENT & PROJET =================
+            // ================= 4. DÉVELOPPEMENT & LÉGAL =================
             Text(
-                text = "Développement",
+                text = "À propos & Légal",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -221,9 +223,35 @@ fun SettingsScreen(
                         icon = Icons.Default.Code,
                         title = "Projet GitHub",
                         subtitle = "Consulter le code source",
-                        trailingIcon = Icons.Default.OpenInNew,
+                        trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal"))
+                            context.startActivity(intent)
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                    SettingsClickableItem(
+                        icon = Icons.Default.Gavel,
+                        title = "Logiciels open source",
+                        subtitle = "Licences des bibliothèques tierces",
+                        trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE"))
+                            context.startActivity(intent)
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                    SettingsClickableItem(
+                        icon = Icons.Default.PrivacyTip,
+                        title = "Politique de confidentialité (RGPD)",
+                        subtitle = "Gestion et protection de vos données",
+                        trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/PRIVACY.md"))
                             context.startActivity(intent)
                         }
                     )
@@ -239,8 +267,6 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             // ================= 5. DÉCONNEXION & SUPPRESSION =================
             OutlinedButton(
                 onClick = {
@@ -250,7 +276,7 @@ fun SettingsScreen(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Logout, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Se déconnecter")
             }

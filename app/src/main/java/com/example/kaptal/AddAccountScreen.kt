@@ -10,10 +10,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.kaptal.model.Account
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,7 +171,7 @@ fun AddAccountScreen(
                         val newAccount = Account(
                             id = System.currentTimeMillis().toString(),
                             name = accountName.trim(),
-                            balance = parsedBalance ?: 0.0,
+                            initialBalance = parsedBalance ?: 0.0,
                             currency = selectedCurrency
                         )
                         onAccountAdded(newAccount)
