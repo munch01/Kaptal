@@ -17,6 +17,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 @Composable
 fun AuthScreen(
@@ -24,12 +26,35 @@ fun AuthScreen(
     modifier: Modifier = Modifier
 ) {
     val auth = FirebaseAuth.getInstance()
+    val firestore = FirebaseFirestore.getInstance()
     val context = LocalContext.current
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isSignUp by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+
+    // Fonction utilitaire pour enregistrer/mettre à jour l'utilisateur dans Firestore
+    fun saveUserToFirestore(onComplete: () -> Unit) {
+        val currentUser = auth.currentUser
+        if (currentUser != null && currentUser.email != null) {
+            val userId = currentUser.uid
+            val userEmail = currentUser.email!!.trim().lowercase()
+
+            val userMap = hashMapOf(
+                "email" to userEmail
+            )
+
+            firestore.collection("users")
+                .document(userId)
+                .set(userMap, SetOptions.merge())
+                .addOnCompleteListener {
+                    onComplete()
+                }
+        } else {
+            onComplete()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -92,20 +117,26 @@ fun AuthScreen(
                 if (isSignUp) {
                     auth.createUserWithEmailAndPassword(email.trim(), password.trim())
                         .addOnCompleteListener { task ->
-                            isLoading = false
                             if (task.isSuccessful) {
-                                onAuthSuccess()
+                                saveUserToFirestore {
+                                    isLoading = false
+                                    onAuthSuccess()
+                                }
                             } else {
+                                isLoading = false
                                 Toast.makeText(context, "Erreur : ${task.exception?.message}", Toast.LENGTH_LONG).show()
                             }
                         }
                 } else {
                     auth.signInWithEmailAndPassword(email.trim(), password.trim())
                         .addOnCompleteListener { task ->
-                            isLoading = false
                             if (task.isSuccessful) {
-                                onAuthSuccess()
+                                saveUserToFirestore {
+                                    isLoading = false
+                                    onAuthSuccess()
+                                }
                             } else {
+                                isLoading = false
                                 Toast.makeText(context, "Échec de connexion : ${task.exception?.message}", Toast.LENGTH_LONG).show()
                             }
                         }

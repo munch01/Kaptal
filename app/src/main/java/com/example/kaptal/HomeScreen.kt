@@ -358,7 +358,11 @@ fun AccountFormDialog(
     var bankName by remember { mutableStateOf(initialAccount?.bankName ?: "") }
     var initialBalanceText by remember { mutableStateOf(initialAccount?.initialBalance?.toString() ?: "") }
     var selectedType by remember { mutableStateOf(initialAccount?.type ?: "CHECKING") }
-    var isJoint by remember { mutableStateOf(initialAccount?.isJoint ?: false) }
+    var isJoint by remember {
+        mutableStateOf(
+            initialAccount?.let { it.isJoint || it.members.size > 1 } ?: false
+        )
+    }
     var selectedColor by remember { mutableStateOf(initialAccount?.color?.takeIf { it.isNotBlank() } ?: "#2196F3") }
     var memberEmail by remember { mutableStateOf("") }
 
@@ -456,10 +460,19 @@ fun AccountFormDialog(
                 }
 
                 if (isJoint) {
+                    // Si le compte a déjà plusieurs membres, on affiche une petite info, sinon on invite à saisir l'e-mail
+                    if (initialAccount != null && initialAccount.members.size > 1) {
+                        Text(
+                            text = "💡 Ce compte est déjà partagé avec d'autres utilisateurs (${initialAccount.members.size} membres).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     OutlinedTextField(
                         value = memberEmail,
                         onValueChange = { memberEmail = it },
-                        label = { Text("E-mail du co-titulaire") },
+                        label = { Text("Ajouter un co-titulaire (E-mail)") },
                         placeholder = { Text("Ex: jessica@example.com") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),

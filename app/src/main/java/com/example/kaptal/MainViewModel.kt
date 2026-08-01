@@ -5,6 +5,7 @@ import com.example.kaptal.model.Account
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,7 +33,25 @@ class MainViewModel : ViewModel() {
     }
 
     init {
+        saveCurrentUserToFirestore() // S'assure que l'utilisateur actuel a sa fiche dans "users"
         loadAccounts()
+    }
+
+    // --- ENREGISTRER L'UTILISATEUR CONNECTÉ DANS FIRESTORE ---
+    private fun saveCurrentUserToFirestore() {
+        val currentUser = auth.currentUser
+        if (currentUser != null && currentUser.email != null) {
+            val userId = currentUser.uid
+            val userEmail = currentUser.email!!.trim().lowercase()
+
+            val userMap = hashMapOf(
+                "email" to userEmail
+            )
+
+            firestore.collection("users")
+                .document(userId)
+                .set(userMap, SetOptions.merge())
+        }
     }
 
     fun loadAccounts() {
