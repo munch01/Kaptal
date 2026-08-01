@@ -14,9 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.kaptal.screens.AssetAccountScreen
+import com.example.kaptal.screens.StandardAccountScreen
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : FragmentActivity() {
@@ -37,7 +40,7 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun KaptalApp(activity: FragmentActivity) {
+fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()) {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
     val context = activity.applicationContext
@@ -81,8 +84,16 @@ fun KaptalApp(activity: FragmentActivity) {
 
             composable("home") {
                 HomeScreen(
+                    viewModel = viewModel,
                     onNavigateToSettings = {
                         navController.navigate("settings")
+                    },
+                    onAccountClick = { account ->
+                        viewModel.selectAccount(account)
+                        when (account.type) {
+                            "CRYPTO", "BROKERAGE" -> navController.navigate("asset_detail")
+                            else -> navController.navigate("standard_detail")
+                        }
                     }
                 )
             }
@@ -93,6 +104,26 @@ fun KaptalApp(activity: FragmentActivity) {
                         navController.popBackStack()
                     }
                 )
+            }
+
+            composable("standard_detail") {
+                val account by viewModel.selectedAccount.collectAsState()
+                account?.let {
+                    StandardAccountScreen(
+                        account = it,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            composable("asset_detail") {
+                val account by viewModel.selectedAccount.collectAsState()
+                account?.let {
+                    AssetAccountScreen(
+                        account = it,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
             }
         }
     } else {

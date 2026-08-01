@@ -3,10 +3,14 @@ package com.example.kaptal
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
@@ -33,6 +37,7 @@ import com.example.kaptal.model.Account
 @Composable
 fun HomeScreen(
     onNavigateToSettings: () -> Unit = {},
+    onAccountClick: (Account) -> Unit = {},
     viewModel: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -157,6 +162,7 @@ fun HomeScreen(
                             ) { account ->
                                 AccountCard(
                                     account = account,
+                                    onClick = { onAccountClick(account) },
                                     onEditClick = { accountToEdit = account },
                                     onDeleteClick = { accountToDelete = account }
                                 )
@@ -174,8 +180,13 @@ fun HomeScreen(
             title = "Ajouter un compte bancaire",
             initialAccount = null,
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, bankName, initialBalance, type, isJoint ->
-                viewModel.addAccount(name, bankName, initialBalance, type, isJoint) {
+            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail ->
+                viewModel.addAccount(name, bankName, initialBalance, type, isJoint, color) { newAccountId ->
+                    if (isJoint && memberEmail.isNotBlank()) {
+                        viewModel.addMemberToAccount(newAccountId, memberEmail) { _, message ->
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
                     showAddDialog = false
                 }
             }
@@ -188,8 +199,13 @@ fun HomeScreen(
             title = "Modifier le compte",
             initialAccount = account,
             onDismiss = { accountToEdit = null },
-            onConfirm = { name, bankName, initialBalance, type, isJoint ->
-                viewModel.updateAccount(account.id, name, bankName, initialBalance, type, isJoint) {
+            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail ->
+                viewModel.updateAccount(account.id, name, bankName, initialBalance, type, isJoint, color) {
+                    if (isJoint && memberEmail.isNotBlank()) {
+                        viewModel.addMemberToAccount(account.id, memberEmail) { _, message ->
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                        }
+                    }
                     accountToEdit = null
                 }
             }
@@ -225,11 +241,19 @@ fun HomeScreen(
 @Composable
 fun AccountCard(
     account: Account,
+    onClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accountColor = try {
+        Color(android.graphics.Color.parseColor(account.color))
+    } catch (e: Exception) {
+        MaterialTheme.colorScheme.primary
+    }
+
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -244,6 +268,13 @@ fun AccountCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp, 40.dp)
+                    .background(accountColor, shape = MaterialTheme.shapes.small)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = account.name,
@@ -261,8 +292,11 @@ fun AccountCard(
                     Text(
                         text = when (account.type) {
                             "SAVINGS" -> "Épargne"
-                            "JOINT" -> "Compte Joint"
-                            else -> "Compte Courant"
+                            "CREDIT" -> "Crédit"
+                            "CRYPTO" -> "Crypto"
+                            "BROKERAGE" -> "Bourse"
+                            "LIFE_INSURANCE" -> "Assurance-vie"
+                            else -> "Courant"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -279,11 +313,10 @@ fun AccountCard(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Couleur dynamique : Vert si positif ou nul, Rouge si négatif
                 val balanceColor = if (account.initialBalance >= 0) {
-                    Color(0xFF2E7D32) // Vert foncé lisible
+                    Color(0xFF2E7D32)
                 } else {
-                    MaterialTheme.colorScheme.error // Rouge des thèmes Material
+                    MaterialTheme.colorScheme.error
                 }
 
                 Text(
@@ -294,7 +327,6 @@ fun AccountCard(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // Bouton Éditer
                 IconButton(onClick = onEditClick) {
                     Icon(
                         imageVector = Icons.Default.Edit,
@@ -303,7 +335,6 @@ fun AccountCard(
                     )
                 }
 
-                // Bouton Supprimer
                 IconButton(onClick = onDeleteClick) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -321,19 +352,36 @@ fun AccountFormDialog(
     title: String,
     initialAccount: Account?,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean) -> Unit
+    onConfirm: (name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean, color: String, memberEmail: String) -> Unit
 ) {
     var accountName by remember { mutableStateOf(initialAccount?.name ?: "") }
     var bankName by remember { mutableStateOf(initialAccount?.bankName ?: "") }
     var initialBalanceText by remember { mutableStateOf(initialAccount?.initialBalance?.toString() ?: "") }
     var selectedType by remember { mutableStateOf(initialAccount?.type ?: "CHECKING") }
     var isJoint by remember { mutableStateOf(initialAccount?.isJoint ?: false) }
+    var selectedColor by remember { mutableStateOf(initialAccount?.color?.takeIf { it.isNotBlank() } ?: "#2196F3") }
+    var memberEmail by remember { mutableStateOf("") }
+
+    val availableColors = listOf("#2196F3", "#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#00BCD4")
+    val accountTypes = listOf(
+        "CHECKING" to "Courant",
+        "SAVINGS" to "Épargne",
+        "CREDIT" to "Crédit",
+        "CRYPTO" to "Crypto",
+        "BROKERAGE" to "Bourse",
+        "LIFE_INSURANCE" to "Assurance-vie"
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 OutlinedTextField(
                     value = accountName,
                     onValueChange = { accountName = it },
@@ -361,25 +409,40 @@ fun AccountFormDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Choix du type de compte
-                Text("Type de compte", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Text("Couleur du compte", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
-                        selected = selectedType == "CHECKING",
-                        onClick = { selectedType = "CHECKING" },
-                        label = { Text("Courant") }
-                    )
-                    FilterChip(
-                        selected = selectedType == "SAVINGS",
-                        onClick = { selectedType = "SAVINGS" },
-                        label = { Text("Épargne") }
-                    )
+                    availableColors.forEach { hexColor ->
+                        val colorInt = android.graphics.Color.parseColor(hexColor)
+                        FilterChip(
+                            selected = selectedColor == hexColor,
+                            onClick = { selectedColor = hexColor },
+                            label = { Text("●", color = Color(colorInt), style = MaterialTheme.typography.titleLarge) }
+                        )
+                    }
                 }
 
-                // Case à cocher Compte Joint / Partagé
+                Text("Type de compte", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    accountTypes.chunked(3).forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowItems.forEach { (typeKey, typeLabel) ->
+                                FilterChip(
+                                    modifier = Modifier.weight(1f),
+                                    selected = selectedType == typeKey,
+                                    onClick = { selectedType = typeKey },
+                                    label = { Text(typeLabel, maxLines = 1) }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -391,6 +454,18 @@ fun AccountFormDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Compte partagé / joint")
                 }
+
+                if (isJoint) {
+                    OutlinedTextField(
+                        value = memberEmail,
+                        onValueChange = { memberEmail = it },
+                        label = { Text("E-mail du co-titulaire") },
+                        placeholder = { Text("Ex: jessica@example.com") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
@@ -398,7 +473,7 @@ fun AccountFormDialog(
                 enabled = accountName.isNotBlank() && initialBalanceText.toDoubleOrNull() != null,
                 onClick = {
                     val initialBalance = initialBalanceText.toDoubleOrNull() ?: 0.0
-                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint)
+                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim())
                 }
             ) {
                 Text("Enregistrer")

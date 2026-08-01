@@ -7,5 +7,7 @@ data class Account(
     val initialBalance: Double = 0.0,
     val type: String = "CHECKING",
     val isJoint: Boolean = false,
-    val currency: String = "€"
+    val currency: String = "€",
+    val color: String = "#2196F3", // Couleur par défaut (Bleu)
+    val members: List<String> = emptyList()
 )

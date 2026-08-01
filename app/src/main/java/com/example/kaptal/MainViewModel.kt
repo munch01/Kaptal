@@ -3,6 +3,7 @@ package com.example.kaptal
 import androidx.lifecycle.ViewModel
 import com.example.kaptal.model.Account
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,14 @@ class MainViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<AccountsUiState>(AccountsUiState.Loading)
     val uiState: StateFlow<AccountsUiState> = _uiState.asStateFlow()
 
+    // --- GESTION DU COMPTE SÉLECTIONNÉ POUR LA NAVIGATION ---
+    private val _selectedAccount = MutableStateFlow<Account?>(null)
+    val selectedAccount: StateFlow<Account?> = _selectedAccount.asStateFlow()
+
+    fun selectAccount(account: Account?) {
+        _selectedAccount.value = account
+    }
+
     init {
         loadAccounts()
     }
@@ -35,9 +44,9 @@ class MainViewModel : ViewModel() {
 
         _uiState.value = AccountsUiState.Loading
 
-        firestore.collection("users")
-            .document(userId)
-            .collection("accounts")
+        // On écoute la collection globale "accounts" où l'utilisateur fait partie des membres
+        firestore.collection("accounts")
+            .whereArrayContains("members", userId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     _uiState.value = AccountsUiState.Error(error.localizedMessage ?: "Erreur inconnue")
@@ -54,42 +63,57 @@ class MainViewModel : ViewModel() {
     }
 
     // --- AJOUTER UN COMPTE ---
-    fun addAccount(name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean, onComplete: () -> Unit) {
+    fun addAccount(
+        name: String,
+        bankName: String,
+        initialBalance: Double,
+        type: String,
+        isJoint: Boolean,
+        color: String,
+        onComplete: (String) -> Unit
+    ) {
         val userId = auth.currentUser?.uid ?: return
 
+        // Le compte intègre l'ID du créateur dans le tableau "members"
         val newAccount = hashMapOf(
             "name" to name,
             "bankName" to bankName,
             "initialBalance" to initialBalance,
             "type" to type,
             "isJoint" to isJoint,
-            "currency" to "€"
+            "color" to color,
+            "currency" to "€",
+            "members" to listOf(userId)
         )
 
-        firestore.collection("users")
-            .document(userId)
-            .collection("accounts")
+        firestore.collection("accounts")
             .add(newAccount)
-            .addOnSuccessListener {
-                onComplete()
+            .addOnSuccessListener { documentReference ->
+                onComplete(documentReference.id)
             }
     }
 
     // --- METTRE À JOUR UN COMPTE ---
-    fun updateAccount(accountId: String, name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean, onComplete: () -> Unit) {
-        val userId = auth.currentUser?.uid ?: return
-
+    fun updateAccount(
+        accountId: String,
+        name: String,
+        bankName: String,
+        initialBalance: Double,
+        type: String,
+        isJoint: Boolean,
+        color: String,
+        onComplete: () -> Unit
+    ) {
         val updatedData = mapOf(
             "name" to name,
             "bankName" to bankName,
             "initialBalance" to initialBalance,
             "type" to type,
-            "isJoint" to isJoint
+            "isJoint" to isJoint,
+            "color" to color
         )
 
-        firestore.collection("users")
-            .document(userId)
-            .collection("accounts")
+        firestore.collection("accounts")
             .document(accountId)
             .update(updatedData)
             .addOnSuccessListener {
@@ -99,12 +123,34 @@ class MainViewModel : ViewModel() {
 
     // --- SUPPRIMER UN COMPTE ---
     fun deleteAccount(accountId: String) {
-        val userId = auth.currentUser?.uid ?: return
-
-        firestore.collection("users")
-            .document(userId)
-            .collection("accounts")
+        firestore.collection("accounts")
             .document(accountId)
             .delete()
+    }
+
+    // --- RECHERCHER ET AJOUTER UN CO-TITULAIRE PAR EMAIL ---
+    fun addMemberToAccount(accountId: String, memberEmail: String, onResult: (Boolean, String) -> Unit) {
+        firestore.collection("users")
+            .whereEqualTo("email", memberEmail.trim().lowercase())
+            .get()
+            .addOnSuccessListener { snapshot ->
+                if (snapshot.isEmpty) {
+                    onResult(false, "Aucun utilisateur trouvé avec cet e-mail.")
+                } else {
+                    val targetUserId = snapshot.documents.first().id
+                    firestore.collection("accounts")
+                        .document(accountId)
+                        .update("members", FieldValue.arrayUnion(targetUserId))
+                        .addOnSuccessListener {
+                            onResult(true, "Co-titulaire ajouté avec succès !")
+                        }
+                        .addOnFailureListener { e ->
+                            onResult(false, e.localizedMessage ?: "Erreur lors du partage.")
+                        }
+                }
+            }
+            .addOnFailureListener { e ->
+                onResult(false, e.localizedMessage ?: "Erreur de recherche.")
+            }
     }
 }
