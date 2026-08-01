@@ -9,5 +9,6 @@ data class Account(
     val isJoint: Boolean = false,
     val currency: String = "€",
     val color: String = "#2196F3", // Couleur par défaut (Bleu)
+    val order: Int = 0,
     val members: List<String> = emptyList()
 )

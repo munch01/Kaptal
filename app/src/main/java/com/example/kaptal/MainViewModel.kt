@@ -1,6 +1,7 @@
 package com.example.kaptal
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.kaptal.model.Account
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -9,6 +10,8 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 sealed class AccountsUiState {
     object Loading : AccountsUiState()
@@ -75,7 +78,7 @@ class MainViewModel : ViewModel() {
                 if (snapshot != null) {
                     val accounts = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Account::class.java)?.copy(id = doc.id)
-                    }
+                    }.sortedBy { it.order }
                     _uiState.value = AccountsUiState.Success(accounts)
                 }
             }
@@ -102,6 +105,7 @@ class MainViewModel : ViewModel() {
             "isJoint" to isJoint,
             "color" to color,
             "currency" to "€",
+            "order" to 0,
             "members" to listOf(userId)
         )
 
@@ -138,6 +142,22 @@ class MainViewModel : ViewModel() {
             .addOnSuccessListener {
                 onComplete()
             }
+    }
+
+    // --- METTRE À JOUR L'ORDRE DES COMPTES ---
+    fun updateAccountsOrder(accounts: List<Account>) {
+        viewModelScope.launch {
+            try {
+                val batch = firestore.batch()
+                accounts.forEachIndexed { index, account ->
+                    val docRef = firestore.collection("accounts").document(account.id)
+                    batch.update(docRef, "order", index)
+                }
+                batch.commit().await()
+            } catch (e: Exception) {
+                // Gérer l'erreur silencieusement ou via l'UI si besoin
+            }
+        }
     }
 
     // --- SUPPRIMER UN COMPTE ---

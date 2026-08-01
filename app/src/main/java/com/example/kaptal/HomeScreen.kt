@@ -5,9 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -152,19 +155,50 @@ fun HomeScreen(
                             )
                         }
                     } else {
+                        var accountsList by remember(state.accounts) {
+                            mutableStateOf(state.accounts.sortedBy { it.order })
+                        }
+                        val listState = rememberLazyListState()
+
                         LazyColumn(
+                            state = listState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
                             items(
-                                items = state.accounts,
-                                key = { it.id }
+                                items = accountsList,
+                                key = { account: Account -> account.id }
                             ) { account ->
                                 AccountCard(
                                     account = account,
                                     onClick = { onAccountClick(account) },
                                     onEditClick = { accountToEdit = account },
-                                    onDeleteClick = { accountToDelete = account }
+                                    onDeleteClick = { accountToDelete = account },
+                                    modifier = Modifier
+                                        .animateItem()
+                                        .pointerInput(accountsList) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = { },
+                                                onDragEnd = {
+                                                    viewModel.updateAccountsOrder(accountsList)
+                                                },
+                                                onDragCancel = {
+                                                    viewModel.updateAccountsOrder(accountsList)
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    val currentIndex = accountsList.indexOf(account)
+                                                    val targetIndex = (currentIndex + if (dragAmount.y > 0) 1 else -1)
+                                                        .coerceIn(0, accountsList.size - 1)
+
+                                                    if (currentIndex != targetIndex) {
+                                                        accountsList = accountsList.toMutableList().apply {
+                                                            add(targetIndex, removeAt(currentIndex))
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
                                 )
                             }
                         }
@@ -460,7 +494,6 @@ fun AccountFormDialog(
                 }
 
                 if (isJoint) {
-                    // Si le compte a déjà plusieurs membres, on affiche une petite info, sinon on invite à saisir l'e-mail
                     if (initialAccount != null && initialAccount.members.size > 1) {
                         Text(
                             text = "💡 Ce compte est déjà partagé avec d'autres utilisateurs (${initialAccount.members.size} membres).",
