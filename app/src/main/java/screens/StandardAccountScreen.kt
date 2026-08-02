@@ -8,6 +8,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kaptal.model.Account
 import com.example.kaptal.model.Transaction
 import com.example.kaptal.viewmodel.AccountDetailViewModel
+import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -35,29 +37,17 @@ fun StandardAccountScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
-
-    // Cache d'état local indexé par l'ID de la transaction
-    val localCheckStates = remember { mutableStateMapOf<String, Boolean>() }
-
-    LaunchedEffect(transactions) {
-        transactions.forEach { tx ->
-            if (!localCheckStates.containsKey(tx.id)) {
-                localCheckStates[tx.id] = tx.isChecked
-            }
-        }
-    }
+    var transactionToDelete by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
 
     LaunchedEffect(account.id) {
         viewModel.loadTransactions(account.id)
     }
 
-    // Initialisation du pager avec la page mémorisée par le MainViewModel
     val pagerState = rememberPagerState(
         initialPage = initialPage,
         pageCount = { 240 }
     )
 
-    // Notifie le MainViewModel dès que la page courante change
     LaunchedEffect(pagerState.currentPage) {
         onPageChanged(pagerState.currentPage)
     }
@@ -111,20 +101,69 @@ fun StandardAccountScreen(
                 val month = cal.get(Calendar.MONTH)
 
                 MonthPageContent(
+                    initialBalance = account.initialBalance,
                     year = year,
                     month = month,
                     transactions = transactions,
-                    localCheckStates = localCheckStates,
-                    onCheckedChange = { transactionId, isChecked ->
-                        localCheckStates[transactionId] = isChecked
-                        viewModel.toggleTransactionCheck(account.id, transactionId, isChecked)
+                    onCheckedChange = { transactionId, monthKey, isChecked ->
+                        viewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
                     },
                     onEditClick = { transaction ->
                         transactionToEdit = transaction
+                    },
+                    onDeleteClick = { transaction ->
+                        val targetCal = Calendar.getInstance().apply {
+                            set(year, month, 1, 0, 0, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        val effectiveTimestamp = Timestamp(targetCal.time)
+                        transactionToDelete = Pair(transaction, effectiveTimestamp)
                     }
                 )
             }
         }
+    }
+
+    // Dialogue de suppression
+    transactionToDelete?.let { (transaction, effectiveDate) ->
+        val isRecurringSeries = transaction.isRecurring
+
+        AlertDialog(
+            onDismissRequest = { transactionToDelete = null },
+            title = {
+                Text(
+                    text = if (isRecurringSeries) "Supprimer la récurrence" else "Supprimer l'opération"
+                )
+            },
+            text = {
+                Text(
+                    text = if (isRecurringSeries) {
+                        "Cette opération est récurrente. Voulez-vous arrêter la récurrence à partir de ce mois ?"
+                    } else {
+                        "Voulez-vous vraiment supprimer l'opération \"${transaction.title}\" ?"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteTransaction(
+                            accountId = account.id,
+                            transaction = transaction,
+                            effectiveDeleteDate = effectiveDate
+                        )
+                        transactionToDelete = null
+                    }
+                ) {
+                    Text("Supprimer", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { transactionToDelete = null }) {
+                    Text("Annuler")
+                }
+            }
+        )
     }
 
     if (showAddSheet) {
@@ -138,7 +177,7 @@ fun StandardAccountScreen(
                     type = type,
                     paymentMethod = paymentMethod,
                     date = date,
-                    isChecked = false,
+                    checkedMonths = emptyList(),
                     isRecurring = isRecurring,
                     recurrenceInterval = recurrenceInterval,
                     endDate = endDate
@@ -173,27 +212,34 @@ fun StandardAccountScreen(
 
 @Composable
 fun MonthPageContent(
+    initialBalance: Double,
     year: Int,
     month: Int,
     transactions: List<Transaction>,
-    localCheckStates: Map<String, Boolean>,
-    onCheckedChange: (String, Boolean) -> Unit,
-    onEditClick: (Transaction) -> Unit
+    onCheckedChange: (String, String, Boolean) -> Unit,
+    onEditClick: (Transaction) -> Unit,
+    onDeleteClick: (Transaction) -> Unit
 ) {
+    val monthKey = remember(year, month) {
+        String.format(Locale.US, "%d-%02d", year, month + 1)
+    }
+
+    // Operations spécifiques au mois actuellement affiché dans la liste
     val monthTransactions = remember(transactions, year, month) {
         transactions.filter { tx ->
-            val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
-            txCal.get(Calendar.YEAR) == year && txCal.get(Calendar.MONTH) == month
+            isTransactionActiveInMonth(tx, year, month)
         }
     }
 
-    val realBalance = remember(monthTransactions, localCheckStates) {
-        monthTransactions.filter { tx ->
-            localCheckStates[tx.id] ?: tx.isChecked
-        }.sumOf { it.amount }
+    // CALCUL DU SOLDE RÉEL CUMULÉ (Report à nouveau + initialBalance)
+    val realBalance = remember(transactions, year, month, initialBalance) {
+        computeCumulativeBalance(initialBalance, transactions, year, month, onlyChecked = true)
     }
 
-    val projectedBalance = remember(monthTransactions) { monthTransactions.sumOf { it.amount } }
+    // CALCUL DU SOLDE PROJETÉ CUMULÉ (Report à nouveau + initialBalance)
+    val projectedBalance = remember(transactions, year, month, initialBalance) {
+        computeCumulativeBalance(initialBalance, transactions, year, month, onlyChecked = false)
+    }
 
     Column(
         modifier = Modifier
@@ -280,15 +326,19 @@ fun MonthPageContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(monthTransactions, key = { it.id }) { transaction ->
-                    val isChecked = localCheckStates[transaction.id] ?: transaction.isChecked
+                    val isCheckedInThisMonth = transaction.isCheckedForMonth(monthKey)
+
                     TransactionItem(
                         transaction = transaction,
-                        isChecked = isChecked,
+                        isChecked = isCheckedInThisMonth,
                         onCheckedChange = { checked ->
-                            onCheckedChange(transaction.id, checked)
+                            onCheckedChange(transaction.id, monthKey, checked)
                         },
                         onEditClick = {
                             onEditClick(transaction)
+                        },
+                        onDeleteClick = {
+                            onDeleteClick(transaction)
                         }
                     )
                 }
@@ -297,12 +347,79 @@ fun MonthPageContent(
     }
 }
 
+// Helper : Vérifie si une transaction est valide pour un mois donné
+private fun isTransactionActiveInMonth(tx: Transaction, year: Int, month: Int): Boolean {
+    val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+    val txYear = txCal.get(Calendar.YEAR)
+    val txMonth = txCal.get(Calendar.MONTH)
+
+    return if (tx.isRecurring) {
+        val startsBeforeOrDuring = (txYear < year) || (txYear == year && txMonth <= month)
+        val endsAfterOrDuring = if (tx.endDate != null) {
+            val endCal = Calendar.getInstance().apply { time = tx.endDate.toDate() }
+            val endYear = endCal.get(Calendar.YEAR)
+            val endMonth = endCal.get(Calendar.MONTH)
+            (year < endYear) || (year == endYear && month < endMonth)
+        } else {
+            true
+        }
+        startsBeforeOrDuring && endsAfterOrDuring
+    } else {
+        txYear == year && txMonth == month
+    }
+}
+
+// Helper : Calcule le solde cumulé à partir du solde initial jusqu'au mois (year, month) cible inclus
+private fun computeCumulativeBalance(
+    initialBalance: Double,
+    transactions: List<Transaction>,
+    targetYear: Int,
+    targetMonth: Int,
+    onlyChecked: Boolean
+): Double {
+    var total = initialBalance
+
+    if (transactions.isEmpty()) return total
+
+    val minDate = transactions.minOf { it.date.toDate() }
+    val minCal = Calendar.getInstance().apply { time = minDate }
+    val startYear = minCal.get(Calendar.YEAR)
+    val startMonth = minCal.get(Calendar.MONTH)
+
+    val currentCal = Calendar.getInstance().apply { set(startYear, startMonth, 1) }
+    val targetCal = Calendar.getInstance().apply { set(targetYear, targetMonth, 1) }
+
+    // On parcourt chaque mois depuis le premier jusqu'au mois cible
+    while (!currentCal.after(targetCal)) {
+        val y = currentCal.get(Calendar.YEAR)
+        val m = currentCal.get(Calendar.MONTH)
+        val mKey = String.format(Locale.US, "%d-%02d", y, m + 1)
+
+        for (tx in transactions) {
+            if (isTransactionActiveInMonth(tx, y, m)) {
+                if (onlyChecked) {
+                    if (tx.isCheckedForMonth(mKey)) {
+                        total += tx.amount
+                    }
+                } else {
+                    total += tx.amount
+                }
+            }
+        }
+
+        currentCal.add(Calendar.MONTH, 1)
+    }
+
+    return total
+}
+
 @Composable
 fun TransactionItem(
     transaction: Transaction,
     isChecked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -342,7 +459,8 @@ fun TransactionItem(
                     fontWeight = FontWeight.Bold,
                     color = if (transaction.amount >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+
                 IconButton(
                     onClick = onEditClick,
                     modifier = Modifier.size(24.dp)
@@ -351,6 +469,19 @@ fun TransactionItem(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Éditer l'opération",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Supprimer l'opération",
+                        tint = MaterialTheme.colorScheme.error
                     )
                 }
             }

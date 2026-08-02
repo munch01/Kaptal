@@ -15,6 +15,7 @@ import com.example.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -277,5 +278,3 @@ fun AddTransactionBottomSheet(
         }
     }
 }
-
-private fun abs(value: Double): Double = if (value < 0) -value else value

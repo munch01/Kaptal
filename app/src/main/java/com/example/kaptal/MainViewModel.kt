@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 // --- ÉTATS DE L'UI ---
 sealed interface AccountsUiState {
@@ -156,6 +158,7 @@ class MainViewModel : ViewModel() {
 
                 // 2. Si le solde initial n'est pas nul, on crée automatiquement la transaction initiale
                 if (initialBalance != 0.0) {
+                    val currentMonthKey = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
                     val transactionRef = newAccountRef.collection("transactions").document()
                     val initialTransaction = Transaction(
                         id = transactionRef.id,
@@ -165,7 +168,7 @@ class MainViewModel : ViewModel() {
                         category = "Divers",
                         paymentMethod = "Virement",
                         date = Timestamp(Date()),
-                        isChecked = true // Pointé par défaut pour alimenter immédiatement le solde réel
+                        checkedMonths = listOf(currentMonthKey) // Pointé par défaut pour le mois en cours
                     )
                     transactionRef.set(initialTransaction).await()
                 }
