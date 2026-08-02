@@ -3,6 +3,8 @@ package com.example.kaptal
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kaptal.model.Account
+import com.example.kaptal.model.Transaction
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Date
 
 // --- ÉTATS DE L'UI ---
 sealed interface AccountsUiState {
@@ -99,7 +102,7 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // --- AJOUT D'UN COMPTE (Sécurisé par UID) ---
+    // --- AJOUT D'UN COMPTE (Sécurisé par UID avec génération du solde initial) ---
     fun addAccount(
         name: String,
         bankName: String,
@@ -136,7 +139,25 @@ class MainViewModel : ViewModel() {
                     ownerId = currentUser.uid
                 )
 
+                // 1. Enregistrement du compte
                 newAccountRef.set(account).await()
+
+                // 2. Si le solde initial n'est pas nul, on crée automatiquement la transaction initiale
+                if (initialBalance != 0.0) {
+                    val transactionRef = newAccountRef.collection("transactions").document()
+                    val initialTransaction = Transaction(
+                        id = transactionRef.id,
+                        title = "Solde initial",
+                        amount = initialBalance,
+                        type = if (initialBalance >= 0) "INCOME" else "EXPENSE",
+                        category = "Divers",
+                        paymentMethod = "Virement",
+                        date = Timestamp(Date()),
+                        isChecked = true // Pointé par défaut pour alimenter immédiatement le solde réel
+                    )
+                    transactionRef.set(initialTransaction).await()
+                }
+
                 onAccountCreated(account.id)
             } catch (e: Exception) {
                 // Gérer l'erreur si nécessaire
