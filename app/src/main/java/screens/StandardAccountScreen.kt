@@ -52,9 +52,8 @@ fun StandardAccountScreen(
         onPageChanged(pagerState.currentPage)
     }
 
-    val currentCalendar = remember { Calendar.getInstance() }
-    val baseYear = remember { currentCalendar.get(Calendar.YEAR) }
-    val baseMonth = remember { currentCalendar.get(Calendar.MONTH) }
+    val baseYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    val baseMonth = remember { Calendar.getInstance().get(Calendar.MONTH) }
 
     Scaffold(
         topBar = {
@@ -92,13 +91,9 @@ fun StandardAccountScreen(
                     .weight(1f)
             ) { page ->
                 val monthOffset = page - 120
-                val cal = remember(page) {
-                    Calendar.getInstance().apply {
-                        set(baseYear, baseMonth + monthOffset, 1)
-                    }
-                }
-                val year = cal.get(Calendar.YEAR)
-                val month = cal.get(Calendar.MONTH)
+                val totalMonths = baseYear * 12 + baseMonth + monthOffset
+                val year = totalMonths / 12
+                val month = totalMonths % 12
 
                 MonthPageContent(
                     initialBalance = account.initialBalance,
@@ -224,19 +219,17 @@ fun MonthPageContent(
         String.format(Locale.US, "%d-%02d", year, month + 1)
     }
 
-    // Operations spécifiques au mois actuellement affiché dans la liste
     val monthTransactions = remember(transactions, year, month) {
-        transactions.filter { tx ->
-            isTransactionActiveInMonth(tx, year, month)
-        }
+        transactions
+            .filter { tx -> isTransactionActiveInMonth(tx, year, month) }
+            .sortedBy { tx -> tx.date.seconds }
+            .toList()
     }
 
-    // CALCUL DU SOLDE RÉEL CUMULÉ (Report à nouveau + initialBalance)
     val realBalance = remember(transactions, year, month, initialBalance) {
         computeCumulativeBalance(initialBalance, transactions, year, month, onlyChecked = true)
     }
 
-    // CALCUL DU SOLDE PROJETÉ CUMULÉ (Report à nouveau + initialBalance)
     val projectedBalance = remember(transactions, year, month, initialBalance) {
         computeCumulativeBalance(initialBalance, transactions, year, month, onlyChecked = false)
     }
@@ -325,7 +318,10 @@ fun MonthPageContent(
                     .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(monthTransactions, key = { it.id }) { transaction ->
+                items(
+                    items = monthTransactions,
+                    key = { tx -> "${tx.id}_${tx.date.seconds}_$monthKey" }
+                ) { transaction ->
                     val isCheckedInThisMonth = transaction.isCheckedForMonth(monthKey)
 
                     TransactionItem(
@@ -347,29 +343,29 @@ fun MonthPageContent(
     }
 }
 
-// Helper : Vérifie si une transaction est valide pour un mois donné
 private fun isTransactionActiveInMonth(tx: Transaction, year: Int, month: Int): Boolean {
     val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
     val txYear = txCal.get(Calendar.YEAR)
     val txMonth = txCal.get(Calendar.MONTH)
 
+    val targetIndex = year * 12 + month
+    val startIndex = txYear * 12 + txMonth
+
     return if (tx.isRecurring) {
-        val startsBeforeOrDuring = (txYear < year) || (txYear == year && txMonth <= month)
+        val startsBeforeOrDuring = startIndex <= targetIndex
         val endsAfterOrDuring = if (tx.endDate != null) {
             val endCal = Calendar.getInstance().apply { time = tx.endDate.toDate() }
-            val endYear = endCal.get(Calendar.YEAR)
-            val endMonth = endCal.get(Calendar.MONTH)
-            (year < endYear) || (year == endYear && month < endMonth)
+            val endIndex = endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
+            targetIndex < endIndex
         } else {
             true
         }
         startsBeforeOrDuring && endsAfterOrDuring
     } else {
-        txYear == year && txMonth == month
+        startIndex == targetIndex
     }
 }
 
-// Helper : Calcule le solde cumulé à partir du solde initial jusqu'au mois (year, month) cible inclus
 private fun computeCumulativeBalance(
     initialBalance: Double,
     transactions: List<Transaction>,
@@ -377,37 +373,45 @@ private fun computeCumulativeBalance(
     targetMonth: Int,
     onlyChecked: Boolean
 ): Double {
+    if (transactions.isEmpty()) return initialBalance
+
+    val targetIndex = targetYear * 12 + targetMonth
     var total = initialBalance
 
-    if (transactions.isEmpty()) return total
+    for (tx in transactions) {
+        val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+        val startIndex = txCal.get(Calendar.YEAR) * 12 + txCal.get(Calendar.MONTH)
 
-    val minDate = transactions.minOf { it.date.toDate() }
-    val minCal = Calendar.getInstance().apply { time = minDate }
-    val startYear = minCal.get(Calendar.YEAR)
-    val startMonth = minCal.get(Calendar.MONTH)
+        if (tx.isRecurring) {
+            val endIndex = tx.endDate?.let {
+                val endCal = Calendar.getInstance().apply { time = it.toDate() }
+                endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
+            } ?: Int.MAX_VALUE
 
-    val currentCal = Calendar.getInstance().apply { set(startYear, startMonth, 1) }
-    val targetCal = Calendar.getInstance().apply { set(targetYear, targetMonth, 1) }
+            val effectiveEndIndex = minOf(targetIndex, endIndex - 1)
 
-    // On parcourt chaque mois depuis le premier jusqu'au mois cible
-    while (!currentCal.after(targetCal)) {
-        val y = currentCal.get(Calendar.YEAR)
-        val m = currentCal.get(Calendar.MONTH)
-        val mKey = String.format(Locale.US, "%d-%02d", y, m + 1)
-
-        for (tx in transactions) {
-            if (isTransactionActiveInMonth(tx, y, m)) {
-                if (onlyChecked) {
-                    if (tx.isCheckedForMonth(mKey)) {
+            if (startIndex <= effectiveEndIndex) {
+                for (mIndex in startIndex..effectiveEndIndex) {
+                    val y = mIndex / 12
+                    val m = mIndex % 12
+                    if (onlyChecked) {
+                        val mKey = String.format(Locale.US, "%d-%02d", y, m + 1)
+                        if (tx.isCheckedForMonth(mKey)) total += tx.amount
+                    } else {
                         total += tx.amount
                     }
+                }
+            }
+        } else {
+            if (startIndex <= targetIndex) {
+                if (onlyChecked) {
+                    val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
+                    if (tx.isCheckedForMonth(mKey)) total += tx.amount
                 } else {
                     total += tx.amount
                 }
             }
         }
-
-        currentCal.add(Calendar.MONTH, 1)
     }
 
     return total
@@ -438,9 +442,7 @@ fun TransactionItem(
             ) {
                 Checkbox(
                     checked = isChecked,
-                    onCheckedChange = { newChecked ->
-                        onCheckedChange(newChecked)
-                    }
+                    onCheckedChange = onCheckedChange
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
@@ -455,7 +457,7 @@ fun TransactionItem(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${if (transaction.amount > 0) "+" else ""}${String.format("%.2f", transaction.amount)} €",
+                    text = "${if (transaction.amount > 0) "+" else ""}${String.format(Locale.FRANCE, "%.2f", transaction.amount)} €",
                     fontWeight = FontWeight.Bold,
                     color = if (transaction.amount >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                 )

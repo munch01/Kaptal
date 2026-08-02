@@ -136,7 +136,8 @@ class MainViewModel : ViewModel() {
                         if (error == null && txSnapshot != null) {
                             val txList = txSnapshot.documents.mapNotNull { doc ->
                                 doc.toObject(Transaction::class.java)?.copy(id = doc.id)
-                            }
+                            }.sortedByDescending { it.date } // TRI PAR DATE DÉCROISSANTE
+
                             accountTransactionsMap[account.id] = txList
                             recalculateBalances(accounts)
                         }
