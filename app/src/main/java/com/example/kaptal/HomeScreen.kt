@@ -5,12 +5,14 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -45,6 +47,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val selectedCurrency by viewModel.appCurrency.collectAsState() // <-- Observation de la devise globale harmonisée
 
     // Gestion des dialogues (Ajout vs Édition)
     var showAddDialog by remember { mutableStateOf(false) }
@@ -163,7 +166,7 @@ fun HomeScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = 12.dp)
+                            contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp) // Espace pour éviter que le FAB ou le bouton café ne cache le dernier élément
                         ) {
                             items(
                                 items = accountsList,
@@ -171,6 +174,7 @@ fun HomeScreen(
                             ) { account ->
                                 AccountCard(
                                     account = account,
+                                    currency = selectedCurrency,
                                     onClick = { onAccountClick(account) },
                                     onEditClick = { accountToEdit = account },
                                     onDeleteClick = { accountToDelete = account },
@@ -203,6 +207,37 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // --- BOUTON "OFFRIR UN CAFÉ" EN BAS À GAUCHE ---
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho")) // Remplacez par votre lien
+                        context.startActivity(intent)
+                    },
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shadowElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "☕",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Café",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
@@ -275,6 +310,7 @@ fun HomeScreen(
 @Composable
 fun AccountCard(
     account: Account,
+    currency: String,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
@@ -354,7 +390,7 @@ fun AccountCard(
                 }
 
                 Text(
-                    text = String.format("%.2f %s", account.initialBalance, account.currency),
+                    text = String.format("%.2f %s", account.initialBalance, currency),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = balanceColor
@@ -441,7 +477,7 @@ fun AccountFormDialog(
                 OutlinedTextField(
                     value = initialBalanceText,
                     onValueChange = { initialBalanceText = it },
-                    label = { Text("Solde initial (€)") },
+                    label = { Text("Solde initial") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()

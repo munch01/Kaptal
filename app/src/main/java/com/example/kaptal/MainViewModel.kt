@@ -4,19 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kaptal.model.Account
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-sealed class AccountsUiState {
-    object Loading : AccountsUiState()
-    data class Success(val accounts: List<Account>) : AccountsUiState()
-    data class Error(val message: String) : AccountsUiState()
+// --- ÉTATS DE L'UI ---
+sealed interface AccountsUiState {
+    object Loading : AccountsUiState
+    data class Success(val accounts: List<Account>) : AccountsUiState
+    data class Error(val message: String) : AccountsUiState
 }
 
 class MainViewModel : ViewModel() {
@@ -24,67 +23,70 @@ class MainViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
 
+    // --- StateFlow principal pour les comptes ---
     private val _uiState = MutableStateFlow<AccountsUiState>(AccountsUiState.Loading)
     val uiState: StateFlow<AccountsUiState> = _uiState.asStateFlow()
 
-    // --- GESTION DU COMPTE SÉLECTIONNÉ POUR LA NAVIGATION ---
+    // --- StateFlow pour la devise globale de l'application ---
+    private val _appCurrency = MutableStateFlow("€")
+    val appCurrency: StateFlow<String> = _appCurrency.asStateFlow()
+
+    // --- StateFlow pour le compte sélectionné ---
     private val _selectedAccount = MutableStateFlow<Account?>(null)
     val selectedAccount: StateFlow<Account?> = _selectedAccount.asStateFlow()
+
+    init {
+        loadAccounts()
+        loadUserSettings()
+    }
 
     fun selectAccount(account: Account?) {
         _selectedAccount.value = account
     }
 
-    init {
-        saveCurrentUserToFirestore() // S'assure que l'utilisateur actuel a sa fiche dans "users"
-        loadAccounts()
-    }
-
-    // --- ENREGISTRER L'UTILISATEUR CONNECTÉ DANS FIRESTORE ---
-    private fun saveCurrentUserToFirestore() {
-        val currentUser = auth.currentUser
-        if (currentUser != null && currentUser.email != null) {
-            val userId = currentUser.uid
-            val userEmail = currentUser.email!!.trim().lowercase()
-
-            val userMap = hashMapOf(
-                "email" to userEmail
-            )
-
-            firestore.collection("users")
-                .document(userId)
-                .set(userMap, SetOptions.merge())
-        }
-    }
-
+    // --- CHARGEMENT DES COMPTES (Sécurisé par UID) ---
     fun loadAccounts() {
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            _uiState.value = AccountsUiState.Error("Utilisateur non connecté")
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            _uiState.value = AccountsUiState.Error("Utilisateur non connecté.")
             return
         }
 
         _uiState.value = AccountsUiState.Loading
 
-        // On écoute la collection globale "accounts" où l'utilisateur fait partie des membres
+        // Utilisation de l'UID pour filtrer les comptes de l'utilisateur
         firestore.collection("accounts")
-            .whereArrayContains("members", userId)
+            .whereArrayContains("members", currentUser.uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    _uiState.value = AccountsUiState.Error(error.localizedMessage ?: "Erreur inconnue")
+                    _uiState.value = AccountsUiState.Error(error.localizedMessage ?: "Erreur de chargement")
                     return@addSnapshotListener
                 }
 
                 if (snapshot != null) {
-                    val accounts = snapshot.documents.mapNotNull { doc ->
+                    val accountsList = snapshot.documents.mapNotNull { doc ->
                         doc.toObject(Account::class.java)?.copy(id = doc.id)
                     }.sortedBy { it.order }
-                    _uiState.value = AccountsUiState.Success(accounts)
+
+                    _uiState.value = AccountsUiState.Success(accountsList)
                 }
             }
     }
 
-    // --- AJOUTER UN COMPTE ---
+    // --- CHARGEMENT DES PRÉFÉRENCES (DEVISE) ---
+    private fun loadUserSettings() {
+        val userId = auth.currentUser?.uid ?: return
+        firestore.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
+            if (snapshot != null && snapshot.exists()) {
+                val currency = snapshot.getString("currency")
+                if (!currency.isNullOrBlank()) {
+                    _appCurrency.value = currency
+                }
+            }
+        }
+    }
+
+    // --- AJOUT D'UN COMPTE (Sécurisé par UID) ---
     fun addAccount(
         name: String,
         bankName: String,
@@ -92,31 +94,45 @@ class MainViewModel : ViewModel() {
         type: String,
         isJoint: Boolean,
         color: String,
-        onComplete: (String) -> Unit
+        onAccountCreated: (String) -> Unit
     ) {
-        val userId = auth.currentUser?.uid ?: return
+        val currentUser = auth.currentUser ?: return
 
-        // Le compte intègre l'ID du créateur dans le tableau "members"
-        val newAccount = hashMapOf(
-            "name" to name,
-            "bankName" to bankName,
-            "initialBalance" to initialBalance,
-            "type" to type,
-            "isJoint" to isJoint,
-            "color" to color,
-            "currency" to "€",
-            "order" to 0,
-            "members" to listOf(userId)
-        )
+        viewModelScope.launch {
+            try {
+                val currentState = _uiState.value
+                val nextOrder = if (currentState is AccountsUiState.Success) {
+                    currentState.accounts.size
+                } else {
+                    0
+                }
 
-        firestore.collection("accounts")
-            .add(newAccount)
-            .addOnSuccessListener { documentReference ->
-                onComplete(documentReference.id)
+                // Ajout de l'UID dans le tableau des membres
+                val membersList = mutableListOf(currentUser.uid)
+
+                val newAccountRef = firestore.collection("accounts").document()
+                val account = Account(
+                    id = newAccountRef.id,
+                    name = name,
+                    bankName = bankName,
+                    initialBalance = initialBalance,
+                    type = type,
+                    isJoint = isJoint,
+                    color = color,
+                    order = nextOrder,
+                    members = membersList,
+                    ownerId = currentUser.uid
+                )
+
+                newAccountRef.set(account).await()
+                onAccountCreated(account.id)
+            } catch (e: Exception) {
+                // Gérer l'erreur si nécessaire
             }
+        }
     }
 
-    // --- METTRE À JOUR UN COMPTE ---
+    // --- MODIFICATION D'UN COMPTE ---
     fun updateAccount(
         accountId: String,
         name: String,
@@ -125,71 +141,89 @@ class MainViewModel : ViewModel() {
         type: String,
         isJoint: Boolean,
         color: String,
-        onComplete: () -> Unit
+        onSuccess: () -> Unit
     ) {
-        val updatedData = mapOf(
-            "name" to name,
-            "bankName" to bankName,
-            "initialBalance" to initialBalance,
-            "type" to type,
-            "isJoint" to isJoint,
-            "color" to color
-        )
+        viewModelScope.launch {
+            try {
+                val updates = mapOf(
+                    "name" to name,
+                    "bankName" to bankName,
+                    "initialBalance" to initialBalance,
+                    "type" to type,
+                    "isJoint" to isJoint,
+                    "color" to color
+                )
 
-        firestore.collection("accounts")
-            .document(accountId)
-            .update(updatedData)
-            .addOnSuccessListener {
-                onComplete()
+                firestore.collection("accounts").document(accountId)
+                    .update(updates)
+                    .await()
+
+                onSuccess()
+            } catch (e: Exception) {
+                // Gérer l'erreur
             }
+        }
     }
 
-    // --- METTRE À JOUR L'ORDRE DES COMPTES ---
-    fun updateAccountsOrder(accounts: List<Account>) {
+    // --- SUPPRESSION D'UN COMPTE ---
+    fun deleteAccount(accountId: String) {
+        viewModelScope.launch {
+            try {
+                firestore.collection("accounts").document(accountId).delete().await()
+            } catch (e: Exception) {
+                // Gérer l'erreur
+            }
+        }
+    }
+
+    // --- MISE À JOUR DE L'ORDRE (DRAG & DROP) ---
+    fun updateAccountsOrder(newOrderedList: List<Account>) {
         viewModelScope.launch {
             try {
                 val batch = firestore.batch()
-                accounts.forEachIndexed { index, account ->
+                newOrderedList.forEachIndexed { index, account ->
                     val docRef = firestore.collection("accounts").document(account.id)
                     batch.update(docRef, "order", index)
                 }
                 batch.commit().await()
             } catch (e: Exception) {
-                // Gérer l'erreur silencieusement ou via l'UI si besoin
+                // Gérer l'erreur de réordonnancement
             }
         }
     }
 
-    // --- SUPPRIMER UN COMPTE ---
-    fun deleteAccount(accountId: String) {
-        firestore.collection("accounts")
-            .document(accountId)
-            .delete()
-    }
-
-    // --- RECHERCHER ET AJOUTER UN CO-TITULAIRE PAR EMAIL ---
+    // --- AJOUT D'UN MEMBRE / CO-TITULAIRE (Par e-mail -> Traduction en UID) ---
     fun addMemberToAccount(accountId: String, memberEmail: String, onResult: (Boolean, String) -> Unit) {
-        firestore.collection("users")
-            .whereEqualTo("email", memberEmail.trim().lowercase())
-            .get()
-            .addOnSuccessListener { snapshot ->
-                if (snapshot.isEmpty) {
+        viewModelScope.launch {
+            try {
+                // 1. Rechercher l'UID correspondant à l'e-mail dans la collection "users"
+                val userQuery = firestore.collection("users")
+                    .whereEqualTo("email", memberEmail)
+                    .get()
+                    .await()
+
+                if (userQuery.isEmpty) {
                     onResult(false, "Aucun utilisateur trouvé avec cet e-mail.")
-                } else {
-                    val targetUserId = snapshot.documents.first().id
-                    firestore.collection("accounts")
-                        .document(accountId)
-                        .update("members", FieldValue.arrayUnion(targetUserId))
-                        .addOnSuccessListener {
-                            onResult(true, "Co-titulaire ajouté avec succès !")
-                        }
-                        .addOnFailureListener { e ->
-                            onResult(false, e.localizedMessage ?: "Erreur lors du partage.")
-                        }
+                    return@launch
                 }
+
+                val memberUid = userQuery.documents[0].id
+
+                // 2. Mettre à jour le document du compte avec l'UID trouvé
+                val docRef = firestore.collection("accounts").document(accountId)
+                val snapshot = docRef.get().await()
+                val currentMembers = snapshot.get("members") as? MutableList<String> ?: mutableListOf()
+
+                if (!currentMembers.contains(memberUid)) {
+                    currentMembers.add(memberUid)
+                    docRef.update("members", currentMembers).await()
+                    onResult(true, "Membre $memberEmail ajouté avec succès.")
+                } else {
+                    onResult(false, "Ce membre fait déjà partie du compte.")
+                }
+            } catch (e: Exception) {
+                onResult(false, "Erreur lors de l'ajout du membre : ${e.localizedMessage}")
             }
-            .addOnFailureListener { e ->
-                onResult(false, e.localizedMessage ?: "Erreur de recherche.")
-            }
+        }
     }
 }

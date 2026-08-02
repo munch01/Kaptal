@@ -20,19 +20,23 @@ import com.example.kaptal.model.Account
 @Composable
 fun AddAccountScreen(
     onBackClick: () -> Unit,
-    onAccountAdded: (Account) -> Unit
+    onAccountAdded: (
+        name: String,
+        bankName: String,
+        initialBalance: Double,
+        type: String,
+        isJoint: Boolean,
+        color: String
+    ) -> Unit
 ) {
     var accountName by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf("") } // Ajouté si vous en avez besoin
     var initialBalance by remember { mutableStateOf("") }
 
-    // Types de comptes et devises
+    // Types de comptes
     val accountTypes = listOf("Compte Courant", "Livret d'Épargne", "Carte de Crédit", "Investissement", "Espèces")
     var selectedType by remember { mutableStateOf(accountTypes[0]) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
-
-    val currencies = listOf("EUR (€)", "USD ($)", "GBP (£)", "CHF (CHF)")
-    var selectedCurrency by remember { mutableStateOf(currencies[0]) }
-    var currencyDropdownExpanded by remember { mutableStateOf(false) }
 
     var nameError by remember { mutableStateOf(false) }
     var balanceError by remember { mutableStateOf(false) }
@@ -74,6 +78,15 @@ fun AddAccountScreen(
                 label = { Text("Nom du compte") },
                 isError = nameError,
                 supportingText = { if (nameError) Text("Le nom du compte est requis") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Nom de la banque (optionnel mais utile selon votre modèle)
+            OutlinedTextField(
+                value = bankName,
+                onValueChange = { bankName = it },
+                label = { Text("Nom de la banque (ex: Boursorama, Revolut...)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -125,38 +138,6 @@ fun AddAccountScreen(
                 }
             }
 
-            // Devise (Dropdown)
-            ExposedDropdownMenuBox(
-                expanded = currencyDropdownExpanded,
-                onExpandedChange = { currencyDropdownExpanded = !currencyDropdownExpanded }
-            ) {
-                OutlinedTextField(
-                    value = selectedCurrency,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Devise") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyDropdownExpanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                )
-
-                ExposedDropdownMenu(
-                    expanded = currencyDropdownExpanded,
-                    onDismissRequest = { currencyDropdownExpanded = false }
-                ) {
-                    currencies.forEach { currency ->
-                        DropdownMenuItem(
-                            text = { Text(currency) },
-                            onClick = {
-                                selectedCurrency = currency
-                                currencyDropdownExpanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
 
             // Bouton de validation
@@ -168,13 +149,14 @@ fun AddAccountScreen(
                     balanceError = parsedBalance == null
 
                     if (!nameError && !balanceError) {
-                        val newAccount = Account(
-                            id = System.currentTimeMillis().toString(),
-                            name = accountName.trim(),
-                            initialBalance = parsedBalance ?: 0.0,
-                            currency = selectedCurrency
+                        onAccountAdded(
+                            accountName.trim(),
+                            bankName.trim(),
+                            parsedBalance ?: 0.0,
+                            selectedType,
+                            false, // isJoint par défaut
+                            "#2196F3" // Couleur par défaut
                         )
-                        onAccountAdded(newAccount)
                         onBackClick()
                     }
                 },
