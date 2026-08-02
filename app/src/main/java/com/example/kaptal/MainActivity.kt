@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.kaptal.screens.CreditAccountScreen
+import com.example.kaptal.screens.CryptoScreen
 import com.example.kaptal.screens.StandardAccountScreen
 import com.google.firebase.auth.FirebaseAuth
 
@@ -86,6 +87,9 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                     onNavigateToSettings = {
                         navController.navigate("settings")
                     },
+                    onNavigateToCrypto = {
+                        navController.navigate("crypto")
+                    },
                     onAccountClick = { account ->
                         viewModel.selectAccount(account)
                         when (account.type) {
@@ -94,6 +98,10 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                         }
                     }
                 )
+            }
+
+            composable("crypto") {
+                CryptoScreen()
             }
 
             composable("settings") {

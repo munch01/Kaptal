@@ -5,19 +5,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kaptal.model.Account
 import com.example.kaptal.model.Transaction
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.text.SimpleDateFormat
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 
 // --- ÉTATS DE L'UI ---
@@ -63,9 +64,39 @@ class MainViewModel : ViewModel() {
     private val _selectedAccount = MutableStateFlow<Account?>(null)
     val selectedAccount: StateFlow<Account?> = _selectedAccount.asStateFlow()
 
+    // --- StateFlow pour les taux de change crypto (ex: "BTC" -> 65000.0) ---
+    private val _cryptoRates = MutableStateFlow<Map<String, Double>>(emptyMap())
+    val cryptoRates: StateFlow<Map<String, Double>> = _cryptoRates.asStateFlow()
+
     init {
         loadAccounts()
         loadUserSettings()
+        fetchCryptoRates()
+    }
+
+    // --- RÉCUPÉRATION DES COURS CRYPTO EN DIRECT (COINGECKO) ---
+    fun fetchCryptoRates() {
+        viewModelScope.launch {
+            try {
+                val rates = withContext(Dispatchers.IO) {
+                    val url = URL("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,cardano,ripple&vs_currencies=eur")
+                    val jsonString = url.readText()
+                    val jsonObject = JSONObject(jsonString)
+
+                    val map = mutableMapOf<String, Double>()
+                    if (jsonObject.has("bitcoin")) map["BTC"] = jsonObject.getJSONObject("bitcoin").getDouble("eur")
+                    if (jsonObject.has("ethereum")) map["ETH"] = jsonObject.getJSONObject("ethereum").getDouble("eur")
+                    if (jsonObject.has("solana")) map["SOL"] = jsonObject.getJSONObject("solana").getDouble("eur")
+                    if (jsonObject.has("tether")) map["USDT"] = jsonObject.getJSONObject("tether").getDouble("eur")
+                    if (jsonObject.has("cardano")) map["ADA"] = jsonObject.getJSONObject("cardano").getDouble("eur")
+                    if (jsonObject.has("ripple")) map["XRP"] = jsonObject.getJSONObject("ripple").getDouble("eur")
+                    map
+                }
+                _cryptoRates.value = rates
+            } catch (e: Exception) {
+                // En cas d'échec réseau, on garde les anciennes valeurs ou une map vide silencieusement
+            }
+        }
     }
 
     fun selectAccount(account: Account?) {
@@ -105,7 +136,6 @@ class MainViewModel : ViewModel() {
                         doc.toObject(Account::class.java)?.copy(id = doc.id)
                     }.sortedBy { it.order }
 
-                    // Mettre à jour les écouteurs de transactions pour chaque compte
                     updateTransactionsListeners(accountsList)
                 }
             }
@@ -114,7 +144,6 @@ class MainViewModel : ViewModel() {
     private fun updateTransactionsListeners(accounts: List<Account>) {
         val currentAccountIds = accounts.map { it.id }.toSet()
 
-        // Nettoyer les écouteurs des comptes supprimés
         transactionsListeners.keys.filter { it !in currentAccountIds }.forEach { id ->
             transactionsListeners[id]?.remove()
             transactionsListeners.remove(id)
@@ -126,7 +155,6 @@ class MainViewModel : ViewModel() {
             return
         }
 
-        // Écouter les transactions de chaque compte
         for (account in accounts) {
             if (!transactionsListeners.containsKey(account.id)) {
                 val listener = firestore.collection("accounts")
@@ -136,7 +164,7 @@ class MainViewModel : ViewModel() {
                         if (error == null && txSnapshot != null) {
                             val txList = txSnapshot.documents.mapNotNull { doc ->
                                 doc.toObject(Transaction::class.java)?.copy(id = doc.id)
-                            }.sortedByDescending { it.date } // TRI PAR DATE DÉCROISSANTE
+                            }.sortedByDescending { it.date }
 
                             accountTransactionsMap[account.id] = txList
                             recalculateBalances(accounts)
@@ -157,15 +185,13 @@ class MainViewModel : ViewModel() {
         _uiState.value = AccountsUiState.Success(accounts, balancesMap)
     }
 
-    // --- CALCUL DU SOLDE RÉEL ACTUEL (STRICTEMENT JUSQU'AU MOIS EN COURS) ---
     private fun calculateCurrentRealBalance(account: Account, transactions: List<Transaction>): Double {
         var total = account.initialBalance
-
         if (transactions.isEmpty()) return total
 
         val now = Calendar.getInstance()
         val currentYear = now.get(Calendar.YEAR)
-        val currentMonth = now.get(Calendar.MONTH) // 0 = Janvier, 11 = Décembre
+        val currentMonth = now.get(Calendar.MONTH)
 
         val minDate = transactions.minOf { it.date.toDate() }
         val minCal = Calendar.getInstance().apply { time = minDate }
@@ -173,7 +199,6 @@ class MainViewModel : ViewModel() {
         var iterYear = minCal.get(Calendar.YEAR)
         var iterMonth = minCal.get(Calendar.MONTH)
 
-        // On boucle mois par mois depuis l'opération la plus ancienne jusqu'AU MOIS EN COURS inclus
         while (iterYear < currentYear || (iterYear == currentYear && iterMonth <= currentMonth)) {
             val mKey = String.format(Locale.US, "%d-%02d", iterYear, iterMonth + 1)
 
@@ -216,7 +241,6 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // --- CHARGEMENT DES PRÉFÉRENCES (DEVISE) ---
     private fun loadUserSettings() {
         val userId = auth.currentUser?.uid ?: return
         firestore.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
@@ -229,7 +253,6 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // --- AJOUT D'UN COMPTE ---
     fun addAccount(
         name: String,
         bankName: String,
@@ -240,19 +263,13 @@ class MainViewModel : ViewModel() {
         onAccountCreated: (String) -> Unit
     ) {
         val currentUser = auth.currentUser ?: return
-
         viewModelScope.launch {
             try {
                 val currentState = _uiState.value
-                val nextOrder = if (currentState is AccountsUiState.Success) {
-                    currentState.accounts.size
-                } else {
-                    0
-                }
-
+                val nextOrder = if (currentState is AccountsUiState.Success) currentState.accounts.size else 0
                 val membersList = mutableListOf(currentUser.uid)
-
                 val newAccountRef = firestore.collection("accounts").document()
+
                 val account = Account(
                     id = newAccountRef.id,
                     name = name,
@@ -268,13 +285,10 @@ class MainViewModel : ViewModel() {
 
                 newAccountRef.set(account).await()
                 onAccountCreated(account.id)
-            } catch (e: Exception) {
-                // Gérer l'erreur si nécessaire
-            }
+            } catch (e: Exception) { }
         }
     }
 
-    // --- MODIFICATION D'UN COMPTE ---
     fun updateAccount(
         accountId: String,
         name: String,
@@ -295,42 +309,28 @@ class MainViewModel : ViewModel() {
                     "isJoint" to isJoint,
                     "color" to color
                 )
-
-                firestore.collection("accounts").document(accountId)
-                    .update(updates)
-                    .await()
+                firestore.collection("accounts").document(accountId).update(updates).await()
                 onSuccess()
-            } catch (e: Exception) {
-                // Gérer l'erreur si nécessaire
-            }
+            } catch (e: Exception) { }
         }
     }
 
-    // --- SUPPRESSION D'UN COMPTE ---
     fun deleteAccount(accountId: String) {
         viewModelScope.launch {
             try {
                 firestore.collection("accounts").document(accountId).delete().await()
-            } catch (e: Exception) {
-                // Gérer l'erreur si nécessaire
-            }
+            } catch (e: Exception) { }
         }
     }
 
-    // --- AJOUT D'UN MEMBRE DANS UN COMPTE JOINT ---
     fun addMemberToAccount(accountId: String, memberEmail: String, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {
-                val userQuery = firestore.collection("users")
-                    .whereEqualTo("email", memberEmail)
-                    .get()
-                    .await()
-
+                val userQuery = firestore.collection("users").whereEqualTo("email", memberEmail).get().await()
                 if (userQuery.isEmpty) {
                     onResult(false, "Aucun utilisateur trouvé avec cet e-mail.")
                     return@launch
                 }
-
                 val newUserId = userQuery.documents.first().id
                 val accountRef = firestore.collection("accounts").document(accountId)
 
@@ -342,7 +342,6 @@ class MainViewModel : ViewModel() {
                         transaction.update(accountRef, "members", updatedMembers, "isJoint", true)
                     }
                 }.await()
-
                 onResult(true, "Membre ajouté avec succès !")
             } catch (e: Exception) {
                 onResult(false, e.localizedMessage ?: "Erreur lors de l'ajout du membre.")
@@ -350,7 +349,6 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // --- MISE À JOUR DE L'ORDRE DES COMPTES ---
     fun updateAccountsOrder(orderedAccounts: List<Account>) {
         viewModelScope.launch {
             try {
@@ -360,9 +358,7 @@ class MainViewModel : ViewModel() {
                     batch.update(ref, "order", index)
                 }
                 batch.commit().await()
-            } catch (e: Exception) {
-                // Gérer l'erreur si nécessaire
-            }
+            } catch (e: Exception) { }
         }
     }
 

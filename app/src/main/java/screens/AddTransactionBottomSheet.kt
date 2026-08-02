@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.kaptal.model.Transaction
+import com.example.kaptal.model.transactionCategories
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -22,7 +23,7 @@ import kotlin.math.abs
 fun AddTransactionBottomSheet(
     initialTransaction: Transaction? = null,
     onDismiss: () -> Unit,
-    onSave: (title: String, amount: Double, category: String, type: String, paymentMethod: String, date: Timestamp, isRecurring: Boolean, recurrenceInterval: String?, endDate: Timestamp?) -> Unit
+    onSave: (title: String, amount: Double, familyCategory: String, subCategory: String, type: String, paymentMethod: String, date: Timestamp, isRecurring: Boolean, recurrenceInterval: String?, endDate: Timestamp?) -> Unit
 ) {
     var title by remember { mutableStateOf(initialTransaction?.title ?: "") }
 
@@ -31,25 +32,29 @@ fun AddTransactionBottomSheet(
 
     var type by remember { mutableStateOf(initialTransaction?.type ?: "EXPENSE") }
 
-    val expenseCategories = listOf(
-        "Nourriture", "Loisir", "Sport", "Essence", "Energie",
-        "Téléphonie et internet", "Assurance", "Crédit ou loyer",
-        "Crédit conso", "Impôt", "Abonnement", "Ecole",
-        "Frais pro", "Médecine", "Beauté et bien-être",
-        "Virement entre compte", "Divers"
-    )
-
+    // --- GESTION DES FAMILLES ET SOUS-CATÉGORIES POUR LES DÉPENSES ---
     val incomeCategories = listOf(
         "Salaire", "Remboursement santé", "Virement entre compte",
         "Virement divers", "Impôts", "Autre / Divers"
     )
 
-    var category by remember {
+    // Initialisation intelligente selon l'opération existante ou par défaut
+    var familyCategory by remember {
         mutableStateOf(
-            initialTransaction?.category ?: expenseCategories.first()
+            if (initialTransaction?.type == "INCOME") "Recettes"
+            else initialTransaction?.familyCategory?.takeIf { it.isNotBlank() } ?: transactionCategories.first().name
         )
     }
-    var expandedCategory by remember { mutableStateOf(false) }
+
+    var subCategory by remember {
+        mutableStateOf(
+            if (initialTransaction?.type == "INCOME") initialTransaction.subCategory.ifBlank { incomeCategories.first() }
+            else initialTransaction?.subCategory?.takeIf { it.isNotBlank() } ?: transactionCategories.first().subCategories.first()
+        )
+    }
+
+    var expandedFamily by remember { mutableStateOf(false) }
+    var expandedSubCategory by remember { mutableStateOf(false) }
 
     val paymentMethods = listOf("CB", "Espèces", "Virement", "Chèque")
     var paymentMethod by remember { mutableStateOf(initialTransaction?.paymentMethod ?: "CB") }
@@ -89,9 +94,8 @@ fun AddTransactionBottomSheet(
                     selected = type == "EXPENSE",
                     onClick = {
                         type = "EXPENSE"
-                        if (!expenseCategories.contains(category)) {
-                            category = expenseCategories.first()
-                        }
+                        familyCategory = transactionCategories.first().name
+                        subCategory = transactionCategories.first().subCategories.first()
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                 ) {
@@ -101,9 +105,8 @@ fun AddTransactionBottomSheet(
                     selected = type == "INCOME",
                     onClick = {
                         type = "INCOME"
-                        if (!incomeCategories.contains(category)) {
-                            category = incomeCategories.first()
-                        }
+                        familyCategory = "Recettes"
+                        subCategory = incomeCategories.first()
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) {
@@ -128,32 +131,99 @@ fun AddTransactionBottomSheet(
                 singleLine = true
             )
 
-            ExposedDropdownMenuBox(
-                expanded = expandedCategory,
-                onExpandedChange = { expandedCategory = !expandedCategory }
-            ) {
-                OutlinedTextField(
-                    value = category,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Catégorie") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                )
-                ExposedDropdownMenu(
-                    expanded = expandedCategory,
-                    onDismissRequest = { expandedCategory = false }
+            // --- SÉLECTION DES CATÉGORIES (DIFFÉRENTE SI DÉPENSE OU RECETTE) ---
+            if (type == "EXPENSE") {
+                // 1. Grande famille (Vital, Confort, Superficiel)
+                ExposedDropdownMenuBox(
+                    expanded = expandedFamily,
+                    onExpandedChange = { expandedFamily = !expandedFamily }
                 ) {
-                    val currentList = if (type == "EXPENSE") expenseCategories else incomeCategories
-                    currentList.forEach { cat ->
-                        DropdownMenuItem(
-                            text = { Text(cat) },
-                            onClick = {
-                                category = cat
-                                expandedCategory = false
-                            }
-                        )
+                    OutlinedTextField(
+                        value = familyCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Grande famille de dépense") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedFamily,
+                        onDismissRequest = { expandedFamily = false }
+                    ) {
+                        transactionCategories.forEach { family ->
+                            DropdownMenuItem(
+                                text = { Text(family.name, fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    familyCategory = family.name
+                                    subCategory = family.subCategories.firstOrNull() ?: ""
+                                    expandedFamily = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // 2. Sous-catégorie dynamique selon la famille choisie
+                val currentFamilyObj = transactionCategories.find { it.name == familyCategory }
+                val availableSubCategories = currentFamilyObj?.subCategories ?: emptyList()
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedSubCategory,
+                    onExpandedChange = { expandedSubCategory = !expandedSubCategory }
+                ) {
+                    OutlinedTextField(
+                        value = subCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Sous-catégorie") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedSubCategory,
+                        onDismissRequest = { expandedSubCategory = false }
+                    ) {
+                        availableSubCategories.forEach { sub ->
+                            DropdownMenuItem(
+                                text = { Text(sub) },
+                                onClick = {
+                                    subCategory = sub
+                                    expandedSubCategory = false
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Pour les Recettes, liste simple de sous-catégories
+                ExposedDropdownMenuBox(
+                    expanded = expandedSubCategory,
+                    onExpandedChange = { expandedSubCategory = !expandedSubCategory }
+                ) {
+                    OutlinedTextField(
+                        value = subCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Catégorie de recette") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedSubCategory,
+                        onDismissRequest = { expandedSubCategory = false }
+                    ) {
+                        incomeCategories.forEach { cat ->
+                            DropdownMenuItem(
+                                text = { Text(cat) },
+                                onClick = {
+                                    subCategory = cat
+                                    expandedSubCategory = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -253,12 +323,14 @@ fun AddTransactionBottomSheet(
                 onClick = {
                     val rawAmount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
                     val finalAmount = if (type == "EXPENSE") -abs(rawAmount) else abs(rawAmount)
+                    val finalFamily = if (type == "INCOME") "Recettes" else familyCategory
 
                     if (title.isNotBlank() && rawAmount != 0.0) {
                         onSave(
                             title,
                             finalAmount,
-                            category,
+                            finalFamily,
+                            subCategory,
                             type,
                             paymentMethod,
                             Timestamp(selectedDate),

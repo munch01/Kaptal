@@ -10,7 +10,11 @@ data class Transaction(
     val amount: Double = 0.0,
     val date: Timestamp = Timestamp.now(),
     val type: String = "EXPENSE", // "EXPENSE" ou "INCOME"
-    val category: String = "Autre",
+
+    // --- NOUVELLES CATÉGORIES ---
+    val familyCategory: String = "Vital / Incompressible", // La grande famille
+    val subCategory: String = "Alimentation",              // La sous-catégorie précise
+
     val paymentMethod: String = "CB",
 
     // --- POINTAGE INDÉPENDANT PAR MOIS (ex: ["2026-05", "2026-06"]) ---

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ fun StandardAccountScreen(
     val transactions by viewModel.transactions.collectAsState()
 
     var showAddSheet by remember { mutableStateOf(false) }
+    var showChartSheet by remember { mutableStateOf(false) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
     var transactionToDelete by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
 
@@ -71,13 +73,31 @@ fun StandardAccountScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Ajouter une opération")
+                // Bouton Info/Répartition en bas à gauche
+                FloatingActionButton(
+                    onClick = { showChartSheet = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Icon(imageVector = Icons.Default.Info, contentDescription = "Répartition par catégorie")
+                }
+
+                // Bouton Ajouter (+) en bas à droite
+                FloatingActionButton(
+                    onClick = { showAddSheet = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Ajouter une opération")
+                }
             }
-        }
+        },
+        floatingActionButtonPosition = FabPosition.Center
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -117,6 +137,21 @@ fun StandardAccountScreen(
                 )
             }
         }
+    }
+
+    // Dialogue de Répartition par catégorie basé sur le mois actif du Pager
+    if (showChartSheet) {
+        val currentMonthOffset = pagerState.currentPage - 120
+        val totalMonths = baseYear * 12 + baseMonth + currentMonthOffset
+        val dialogYear = totalMonths / 12
+        val dialogMonth = totalMonths % 12
+
+        CategoryDistributionDialog(
+            transactions = transactions,
+            year = dialogYear,
+            month = dialogMonth,
+            onDismiss = { showChartSheet = false }
+        )
     }
 
     // Dialogue de suppression
@@ -164,11 +199,12 @@ fun StandardAccountScreen(
     if (showAddSheet) {
         AddTransactionBottomSheet(
             onDismiss = { showAddSheet = false },
-            onSave = { title, amount, category, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
                 val newTransaction = Transaction(
                     title = title,
                     amount = amount,
-                    category = category,
+                    familyCategory = familyCategory,
+                    subCategory = subCategory,
                     type = type,
                     paymentMethod = paymentMethod,
                     date = date,
@@ -186,11 +222,12 @@ fun StandardAccountScreen(
         AddTransactionBottomSheet(
             initialTransaction = transaction,
             onDismiss = { transactionToEdit = null },
-            onSave = { title, amount, category, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
                 val updatedTransaction = transaction.copy(
                     title = title,
                     amount = amount,
-                    category = category,
+                    familyCategory = familyCategory,
+                    subCategory = subCategory,
                     type = type,
                     paymentMethod = paymentMethod,
                     date = date,
@@ -204,6 +241,168 @@ fun StandardAccountScreen(
         )
     }
 }
+
+@Composable
+fun CategoryDistributionDialog(
+    transactions: List<Transaction>,
+    year: Int,
+    month: Int,
+    onDismiss: () -> Unit
+) {
+    val activeTransactions = remember(transactions, year, month) {
+        transactions.filter { tx -> isTransactionActiveInMonth(tx, year, month) }
+    }
+
+    // Structure hiérarchique : Regroupement par Famille -> puis par Sous-catégorie
+    val categoryHierarchy = remember(activeTransactions, year, month) {
+        val expenses = activeTransactions.filter { it.amount < 0 }
+        val totalExp = expenses.sumOf { kotlin.math.abs(it.amount) }
+
+        expenses.groupBy { it.familyCategory.ifEmpty { "Autre" } }
+            .map { (family, familyTxList) ->
+                val familyTotal = familyTxList.sumOf { kotlin.math.abs(it.amount) }
+                val familyPercentage = if (totalExp > 0) (familyTotal / totalExp) * 100 else 0.0
+
+                val subCategories = familyTxList.groupBy { it.subCategory.ifEmpty { "Autre" } }
+                    .map { (sub, subTxList) ->
+                        val subTotal = subTxList.sumOf { kotlin.math.abs(it.amount) }
+                        val subPercentageOfFamily = if (familyTotal > 0) (subTotal / familyTotal) * 100 else 0.0
+                        Triple(sub, subTotal, subPercentageOfFamily)
+                    }
+                    .sortedByDescending { it.second }
+
+                Quadruple(family, familyTotal, familyPercentage, subCategories)
+            }
+            .sortedByDescending { it.second }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Répartition par catégorie", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 450.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Dépenses pour ${getMonthName(year, month)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                if (categoryHierarchy.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Aucune dépense ce mois-ci",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(categoryHierarchy) { (family, familyAmount, familyPercentage, subCategories) ->
+                            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                // Ligne principale de la Famille
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = family,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.FRANCE, "%.2f", familyAmount)} € (${String.format(Locale.FRANCE, "%.1f", familyPercentage)}%)",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                // Grande barre de progression principale
+                                LinearProgressIndicator(
+                                    progress = { (familyPercentage / 100).toFloat() },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(10.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Sous-catégories en retrait sous la grande barre
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    subCategories.forEach { (subCategory, subAmount, subPercentageOfFamily) ->
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = "• $subCategory",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    text = "${String.format(Locale.FRANCE, "%.2f", subAmount)} € (${String.format(Locale.FRANCE, "%.1f", subPercentageOfFamily)}% de la famille)",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            // Petite barre de progression pour la sous-catégorie
+                                            LinearProgressIndicator(
+                                                progress = { (subPercentageOfFamily / 100).toFloat() },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(4.dp),
+                                                color = MaterialTheme.colorScheme.secondary,
+                                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Fermer")
+            }
+        }
+    )
+}
+
+// Classe utilitaire pour le regroupement hiérarchique
+data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
 
 @Composable
 fun MonthPageContent(
@@ -448,7 +647,7 @@ fun TransactionItem(
                 Column {
                     Text(text = transaction.title, fontWeight = FontWeight.Medium)
                     Text(
-                        text = transaction.category,
+                        text = "${transaction.familyCategory} • ${transaction.subCategory}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
