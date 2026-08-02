@@ -16,17 +16,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,9 +45,8 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    val selectedCurrency by viewModel.appCurrency.collectAsState() // <-- Observation de la devise globale harmonisée
+    val selectedCurrency by viewModel.appCurrency.collectAsState()
 
-    // Gestion des dialogues (Ajout vs Édition)
     var showAddDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
     var accountToDelete by remember { mutableStateOf<Account?>(null) }
@@ -172,8 +169,12 @@ fun HomeScreen(
                                 items = accountsList,
                                 key = { account: Account -> account.id }
                             ) { account ->
+                                // On récupère le solde réel actuel calculé par le ViewModel
+                                val realBalance = state.accountBalances[account.id] ?: account.initialBalance
+
                                 AccountCard(
                                     account = account,
+                                    currentBalance = realBalance,
                                     currency = selectedCurrency,
                                     onClick = { onAccountClick(account) },
                                     onEditClick = { accountToEdit = account },
@@ -210,7 +211,7 @@ fun HomeScreen(
                 }
             }
 
-            // --- BOUTON "OFFRIR UN CAFÉ" EN BAS À GAUCHE ---
+            // --- BOUTON "OFFRIR UN CAFÉ" ---
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -310,6 +311,7 @@ fun HomeScreen(
 @Composable
 fun AccountCard(
     account: Account,
+    currentBalance: Double,
     currency: String,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
@@ -380,14 +382,14 @@ fun AccountCard(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val balanceColor = if (account.initialBalance >= 0) {
+                val balanceColor = if (currentBalance >= 0) {
                     Color(0xFF2E7D32)
                 } else {
                     MaterialTheme.colorScheme.error
                 }
 
                 Text(
-                    text = String.format("%.2f %s", account.initialBalance, currency),
+                    text = String.format("%.2f %s", currentBalance, currency),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = balanceColor
@@ -435,7 +437,6 @@ fun AccountFormDialog(
 
     val availableColors = listOf("#2196F3", "#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#00BCD4")
 
-    // --- LISTE DES 3 TYPES DE COMPTES SOUHAITÉS ---
     val accountTypes = listOf(
         "CHECKING" to "Courant",
         "SAVINGS" to "Épargne",
