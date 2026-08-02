@@ -166,7 +166,7 @@ fun HomeScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp) // Espace pour éviter que le FAB ou le bouton café ne cache le dernier élément
+                            contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp)
                         ) {
                             items(
                                 items = accountsList,
@@ -216,7 +216,7 @@ fun HomeScreen(
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
                     .clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho")) // Remplacez par votre lien
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho"))
                         context.startActivity(intent)
                     },
                 shape = RoundedCornerShape(24.dp),
@@ -363,9 +363,6 @@ fun AccountCard(
                         text = when (account.type) {
                             "SAVINGS" -> "Épargne"
                             "CREDIT" -> "Crédit"
-                            "CRYPTO" -> "Crypto"
-                            "BROKERAGE" -> "Bourse"
-                            "LIFE_INSURANCE" -> "Assurance-vie"
                             else -> "Courant"
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -437,13 +434,12 @@ fun AccountFormDialog(
     var memberEmail by remember { mutableStateOf("") }
 
     val availableColors = listOf("#2196F3", "#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#00BCD4")
+
+    // --- LISTE DES 3 TYPES DE COMPTES SOUHAITÉS ---
     val accountTypes = listOf(
         "CHECKING" to "Courant",
         "SAVINGS" to "Épargne",
-        "CREDIT" to "Crédit",
-        "CRYPTO" to "Crypto",
-        "BROKERAGE" to "Bourse",
-        "LIFE_INSURANCE" to "Assurance-vie"
+        "CREDIT" to "Crédit"
     )
 
     AlertDialog(
@@ -499,21 +495,17 @@ fun AccountFormDialog(
                 }
 
                 Text("Type de compte", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    accountTypes.chunked(3).forEach { rowItems ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            rowItems.forEach { (typeKey, typeLabel) ->
-                                FilterChip(
-                                    modifier = Modifier.weight(1f),
-                                    selected = selectedType == typeKey,
-                                    onClick = { selectedType = typeKey },
-                                    label = { Text(typeLabel, maxLines = 1) }
-                                )
-                            }
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    accountTypes.forEach { (typeKey, typeLabel) ->
+                        FilterChip(
+                            modifier = Modifier.weight(1f),
+                            selected = selectedType == typeKey,
+                            onClick = { selectedType = typeKey },
+                            label = { Text(typeLabel, maxLines = 1) }
+                        )
                     }
                 }
 

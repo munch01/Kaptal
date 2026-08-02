@@ -13,7 +13,7 @@ import com.example.kaptal.model.Account
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AssetAccountScreen(
+fun CreditAccountScreen(
     account: Account,
     onBackClick: () -> Unit
 ) {
@@ -42,7 +42,7 @@ fun AssetAccountScreen(
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "Écran d'actifs (Crypto/Bourse) : ${account.name}")
+            Text(text = "Écran Crédit : ${account.name}")
         }
     }
 }

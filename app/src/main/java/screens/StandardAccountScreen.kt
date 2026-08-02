@@ -42,7 +42,7 @@ fun StandardAccountScreen(
                 .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = "Écran du compte standard : ${account.name}")
+            Text(text = "Écran Compte (Courant / Épargne) : ${account.name}")
         }
     }
 }

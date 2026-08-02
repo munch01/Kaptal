@@ -30,11 +30,11 @@ fun AddAccountScreen(
     ) -> Unit
 ) {
     var accountName by remember { mutableStateOf("") }
-    var bankName by remember { mutableStateOf("") } // Ajouté si vous en avez besoin
+    var bankName by remember { mutableStateOf("") }
     var initialBalance by remember { mutableStateOf("") }
 
-    // Types de comptes
-    val accountTypes = listOf("Compte Courant", "Livret d'Épargne", "Carte de Crédit", "Investissement", "Espèces")
+    // Types de comptes épurés (uniquement Courant, Épargne et Espèces)
+    val accountTypes = listOf("Compte Courant", "Livret / Épargne", "Espèces")
     var selectedType by remember { mutableStateOf(accountTypes[0]) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -82,7 +82,7 @@ fun AddAccountScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Nom de la banque (optionnel mais utile selon votre modèle)
+            // Nom de la banque
             OutlinedTextField(
                 value = bankName,
                 onValueChange = { bankName = it },
@@ -106,7 +106,7 @@ fun AddAccountScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Type de compte (Dropdown)
+            // Type de compte (Dropdown épuré)
             ExposedDropdownMenuBox(
                 expanded = typeDropdownExpanded,
                 onExpandedChange = { typeDropdownExpanded = !typeDropdownExpanded }
@@ -154,8 +154,8 @@ fun AddAccountScreen(
                             bankName.trim(),
                             parsedBalance ?: 0.0,
                             selectedType,
-                            false, // isJoint par défaut
-                            "#2196F3" // Couleur par défaut
+                            false,
+                            "#2196F3"
                         )
                         onBackClick()
                     }

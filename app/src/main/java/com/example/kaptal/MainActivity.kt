@@ -18,7 +18,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.kaptal.screens.AssetAccountScreen
+import com.example.kaptal.screens.CreditAccountScreen
 import com.example.kaptal.screens.StandardAccountScreen
 import com.google.firebase.auth.FirebaseAuth
 
@@ -52,7 +52,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
     // Si une session existe ET que la biométrie est activée -> on verrouille au démarrage
     var isUnlocked by remember { mutableStateOf(!hasSession || !isBiometricEnabled) }
 
-    // Déclenché UNISUEMENT au lancement si la session est active
+    // Déclenché UNIQUEMENT au lancement si la session est active
     LaunchedEffect(Unit) {
         if (hasSession && isBiometricEnabled) {
             triggerAppUnlockBiometric(
@@ -91,7 +91,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                     onAccountClick = { account ->
                         viewModel.selectAccount(account)
                         when (account.type) {
-                            "CRYPTO", "BROKERAGE" -> navController.navigate("asset_detail")
+                            "CREDIT" -> navController.navigate("credit_detail")
                             else -> navController.navigate("standard_detail")
                         }
                     }
@@ -116,10 +116,10 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                 }
             }
 
-            composable("asset_detail") {
+            composable("credit_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
                 account?.let {
-                    AssetAccountScreen(
+                    CreditAccountScreen(
                         account = it,
                         onBackClick = { navController.popBackStack() }
                     )
@@ -127,18 +127,25 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
             }
         }
     } else {
-        // Écran d'attente si la biométrie est annulée ou échouée au lancement
+        // Écran d'attente / verrouillage avec option de secours par mot de passe
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = "Kaptal est verrouillé",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 Button(
                     onClick = {
                         triggerAppUnlockBiometric(
@@ -146,9 +153,23 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                             onSuccess = { isUnlocked = true },
                             onError = { }
                         )
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Déverrouiller avec l'empreinte")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // BOUTON DE SECOURS : Déconnecte et force l'affichage de l'écran d'authentification classique
+                OutlinedButton(
+                    onClick = {
+                        auth.signOut()
+                        isUnlocked = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Utiliser le mot de passe")
                 }
             }
         }

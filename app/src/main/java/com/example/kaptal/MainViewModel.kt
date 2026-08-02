@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.kaptal.model.Account
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,7 +45,7 @@ class MainViewModel : ViewModel() {
         _selectedAccount.value = account
     }
 
-    // --- CHARGEMENT DES COMPTES (Sécurisé par UID) ---
+    // --- CHARGEMENT DES COMPTES (Sécurisé par UID avec auto-retry en cas de latence du jeton) ---
     fun loadAccounts() {
         val currentUser = auth.currentUser
         if (currentUser == null) {
@@ -59,7 +60,19 @@ class MainViewModel : ViewModel() {
             .whereArrayContains("members", currentUser.uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    _uiState.value = AccountsUiState.Error(error.localizedMessage ?: "Erreur de chargement")
+                    // Si l'erreur est liée aux permissions (souvent due au jeton non prêt au tout premier boot)
+                    val errorMessage = error.localizedMessage ?: ""
+                    if (errorMessage.contains("PERMISSION_DENIED", ignoreCase = true) ||
+                        errorMessage.contains("permissions", ignoreCase = true)) {
+
+                        // On retente automatiquement après 1 seconde le temps que le jeton se propage
+                        viewModelScope.launch {
+                            delay(1000)
+                            loadAccounts()
+                        }
+                    } else {
+                        _uiState.value = AccountsUiState.Error(errorMessage.ifBlank { "Erreur de chargement" })
+                    }
                     return@addSnapshotListener
                 }
 
@@ -107,7 +120,6 @@ class MainViewModel : ViewModel() {
                     0
                 }
 
-                // Ajout de l'UID dans le tableau des membres
                 val membersList = mutableListOf(currentUser.uid)
 
                 val newAccountRef = firestore.collection("accounts").document()
@@ -192,11 +204,10 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    // --- AJOUT D'UN MEMBRE / CO-TITULAIRE (Par e-mail -> Traduction en UID) ---
+    // --- AJOUT D'UN MEMBRE / CO-TITULAIRE ---
     fun addMemberToAccount(accountId: String, memberEmail: String, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {
-                // 1. Rechercher l'UID correspondant à l'e-mail dans la collection "users"
                 val userQuery = firestore.collection("users")
                     .whereEqualTo("email", memberEmail)
                     .get()
@@ -209,7 +220,6 @@ class MainViewModel : ViewModel() {
 
                 val memberUid = userQuery.documents[0].id
 
-                // 2. Mettre à jour le document du compte avec l'UID trouvé
                 val docRef = firestore.collection("accounts").document(accountId)
                 val snapshot = docRef.get().await()
                 val currentMembers = snapshot.get("members") as? MutableList<String> ?: mutableListOf()
