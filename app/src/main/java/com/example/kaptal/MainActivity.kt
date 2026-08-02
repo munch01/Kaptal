@@ -49,10 +49,8 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
     val isBiometricEnabled = remember { prefs.getBoolean("biometric_enabled", false) }
     val hasSession = auth.currentUser != null
 
-    // Si une session existe ET que la biométrie est activée -> on verrouille au démarrage
     var isUnlocked by remember { mutableStateOf(!hasSession || !isBiometricEnabled) }
 
-    // Déclenché UNIQUEMENT au lancement si la session est active
     LaunchedEffect(Unit) {
         if (hasSession && isBiometricEnabled) {
             triggerAppUnlockBiometric(
@@ -65,9 +63,9 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
         }
     }
 
-    if (isUnlocked) {
-        val startDestination = if (hasSession) "home" else "auth"
+    val startDestination = if (hasSession) "home" else "auth"
 
+    Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = startDestination
@@ -108,9 +106,15 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
 
             composable("standard_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
-                account?.let {
+                account?.let { acc ->
                     StandardAccountScreen(
-                        account = it,
+                        account = acc,
+                        // On récupère la position sauvegardée dans le MainViewModel (120 par défaut)
+                        initialPage = viewModel.getSavedPagerPosition(acc.id),
+                        // On met à jour le MainViewModel à chaque fois qu'on change de mois
+                        onPageChanged = { page ->
+                            viewModel.savePagerPosition(acc.id, page)
+                        },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
@@ -126,50 +130,55 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                 }
             }
         }
-    } else {
-        // Écran d'attente / verrouillage avec option de secours par mot de passe
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+
+        if (!isUnlocked) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
             ) {
-                Text(
-                    text = "Kaptal est verrouillé",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        triggerAppUnlockBiometric(
-                            activity = activity,
-                            onSuccess = { isUnlocked = true },
-                            onError = { }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Kaptal est verrouillé",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary
                         )
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Déverrouiller avec l'empreinte")
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                // BOUTON DE SECOURS : Déconnecte et force l'affichage de l'écran d'authentification classique
-                OutlinedButton(
-                    onClick = {
-                        auth.signOut()
-                        isUnlocked = true
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Utiliser le mot de passe")
+                        Button(
+                            onClick = {
+                                triggerAppUnlockBiometric(
+                                    activity = activity,
+                                    onSuccess = { isUnlocked = true },
+                                    onError = { }
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Déverrouiller avec l'empreinte")
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                auth.signOut()
+                                isUnlocked = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Utiliser le mot de passe")
+                        }
+                    }
                 }
             }
         }

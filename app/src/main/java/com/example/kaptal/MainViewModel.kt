@@ -1,5 +1,6 @@
 package com.example.kaptal
 
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kaptal.model.Account
@@ -26,6 +27,17 @@ class MainViewModel : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+
+    // --- SAUVEGARDE DE LA POSITION DU PAGER PAR COMPTE ---
+    private val savedPagerPositions = mutableStateMapOf<String, Int>()
+
+    fun getSavedPagerPosition(accountId: String): Int {
+        return savedPagerPositions[accountId] ?: 120
+    }
+
+    fun savePagerPosition(accountId: String, page: Int) {
+        savedPagerPositions[accountId] = page
+    }
 
     // --- StateFlow principal pour les comptes ---
     private val _uiState = MutableStateFlow<AccountsUiState>(AccountsUiState.Loading)

@@ -1,6 +1,5 @@
 package com.example.kaptal.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +26,8 @@ import java.util.*
 @Composable
 fun StandardAccountScreen(
     account: Account,
+    initialPage: Int = 120,
+    onPageChanged: (Int) -> Unit = {},
     onBackClick: () -> Unit,
     viewModel: AccountDetailViewModel = viewModel()
 ) {
@@ -35,17 +36,35 @@ fun StandardAccountScreen(
     var showAddSheet by remember { mutableStateOf(false) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
 
+    // Cache d'état local indexé par l'ID de la transaction
+    val localCheckStates = remember { mutableStateMapOf<String, Boolean>() }
+
+    LaunchedEffect(transactions) {
+        transactions.forEach { tx ->
+            if (!localCheckStates.containsKey(tx.id)) {
+                localCheckStates[tx.id] = tx.isChecked
+            }
+        }
+    }
+
     LaunchedEffect(account.id) {
         viewModel.loadTransactions(account.id)
     }
 
+    // Initialisation du pager avec la page mémorisée par le MainViewModel
     val pagerState = rememberPagerState(
-        initialPage = 120,
+        initialPage = initialPage,
         pageCount = { 240 }
     )
-    val currentCalendar = Calendar.getInstance()
-    val baseYear = currentCalendar.get(Calendar.YEAR)
-    val baseMonth = currentCalendar.get(Calendar.MONTH)
+
+    // Notifie le MainViewModel dès que la page courante change
+    LaunchedEffect(pagerState.currentPage) {
+        onPageChanged(pagerState.currentPage)
+    }
+
+    val currentCalendar = remember { Calendar.getInstance() }
+    val baseYear = remember { currentCalendar.get(Calendar.YEAR) }
+    val baseMonth = remember { currentCalendar.get(Calendar.MONTH) }
 
     Scaffold(
         topBar = {
@@ -78,119 +97,32 @@ fun StandardAccountScreen(
         ) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) { page ->
                 val monthOffset = page - 120
-                val cal = Calendar.getInstance().apply {
-                    set(baseYear, baseMonth + monthOffset, 1)
+                val cal = remember(page) {
+                    Calendar.getInstance().apply {
+                        set(baseYear, baseMonth + monthOffset, 1)
+                    }
                 }
                 val year = cal.get(Calendar.YEAR)
                 val month = cal.get(Calendar.MONTH)
 
-                // Filtrage direct des transactions physiques stockées dans Firestore
-                val monthTransactions = transactions.filter { tx ->
-                    val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
-                    txCal.get(Calendar.YEAR) == year && txCal.get(Calendar.MONTH) == month
-                }
-
-                val realBalance = monthTransactions.filter { it.isChecked }.sumOf { it.amount }
-                val projectedBalance = monthTransactions.sumOf { it.amount }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = getMonthName(year, month),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                MonthPageContent(
+                    year = year,
+                    month = month,
+                    transactions = transactions,
+                    localCheckStates = localCheckStates,
+                    onCheckedChange = { transactionId, isChecked ->
+                        localCheckStates[transactionId] = isChecked
+                        viewModel.toggleTransactionCheck(account.id, transactionId, isChecked)
+                    },
+                    onEditClick = { transaction ->
+                        transactionToEdit = transaction
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Card(
-                            modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(text = "Solde Réel", style = MaterialTheme.typography.bodySmall)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "%.2f €".format(realBalance),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        Card(
-                            modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(text = "Solde Projeté", style = MaterialTheme.typography.bodySmall)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "%.2f €".format(projectedBalance),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Opérations",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (monthTransactions.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Aucune opération pour ce mois",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(monthTransactions, key = { it.id }) { transaction ->
-                                TransactionItem(
-                                    transaction = transaction,
-                                    onCheckedChange = { isChecked ->
-                                        viewModel.toggleTransactionCheck(account.id, transaction.id, isChecked)
-                                    },
-                                    onEditClick = {
-                                        transactionToEdit = transaction
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
+                )
             }
         }
     }
@@ -240,8 +172,135 @@ fun StandardAccountScreen(
 }
 
 @Composable
+fun MonthPageContent(
+    year: Int,
+    month: Int,
+    transactions: List<Transaction>,
+    localCheckStates: Map<String, Boolean>,
+    onCheckedChange: (String, Boolean) -> Unit,
+    onEditClick: (Transaction) -> Unit
+) {
+    val monthTransactions = remember(transactions, year, month) {
+        transactions.filter { tx ->
+            val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+            txCal.get(Calendar.YEAR) == year && txCal.get(Calendar.MONTH) == month
+        }
+    }
+
+    val realBalance = remember(monthTransactions, localCheckStates) {
+        monthTransactions.filter { tx ->
+            localCheckStates[tx.id] ?: tx.isChecked
+        }.sumOf { it.amount }
+    }
+
+    val projectedBalance = remember(monthTransactions) { monthTransactions.sumOf { it.amount } }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = getMonthName(year, month),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(text = "Solde Réel", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%.2f €".format(realBalance),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Card(
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(text = "Solde Projeté", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "%.2f €".format(projectedBalance),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Opérations",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (monthTransactions.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Aucune opération pour ce mois",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(monthTransactions, key = { it.id }) { transaction ->
+                    val isChecked = localCheckStates[transaction.id] ?: transaction.isChecked
+                    TransactionItem(
+                        transaction = transaction,
+                        isChecked = isChecked,
+                        onCheckedChange = { checked ->
+                            onCheckedChange(transaction.id, checked)
+                        },
+                        onEditClick = {
+                            onEditClick(transaction)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun TransactionItem(
     transaction: Transaction,
+    isChecked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onEditClick: () -> Unit
 ) {
@@ -261,8 +320,10 @@ fun TransactionItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Checkbox(
-                    checked = transaction.isChecked,
-                    onCheckedChange = { isChecked -> onCheckedChange(isChecked) }
+                    checked = isChecked,
+                    onCheckedChange = { newChecked ->
+                        onCheckedChange(newChecked)
+                    }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
