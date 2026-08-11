@@ -2,6 +2,7 @@ package com.example.kaptal.screens
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -76,151 +77,195 @@ fun AddTransactionBottomSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
+        // Utilisation d'une LazyColumn pour permettre le défilement et garder le bouton accessible
+        LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp)
+                .padding(horizontal = 24.dp)
                 .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            Text(
-                text = if (initialTransaction == null) "Nouvelle opération" else "Modifier l'opération",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            item {
+                Text(
+                    text = if (initialTransaction == null) "Nouvelle opération" else "Modifier l'opération",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = type == "EXPENSE",
-                    onClick = {
-                        type = "EXPENSE"
-                        familyCategory = transactionCategories.first().name
-                        subCategory = transactionCategories.first().subCategories.first()
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) {
-                    Text("Dépense")
-                }
-                SegmentedButton(
-                    selected = type == "INCOME",
-                    onClick = {
-                        type = "INCOME"
-                        familyCategory = "Recettes"
-                        subCategory = incomeCategories.first()
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) {
-                    Text("Recette")
+            item {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = type == "EXPENSE",
+                        onClick = {
+                            type = "EXPENSE"
+                            familyCategory = transactionCategories.first().name
+                            subCategory = transactionCategories.first().subCategories.first()
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text("Dépense")
+                    }
+                    SegmentedButton(
+                        selected = type == "INCOME",
+                        onClick = {
+                            type = "INCOME"
+                            familyCategory = "Recettes"
+                            subCategory = incomeCategories.first()
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("Recette")
+                    }
                 }
             }
 
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Libellé (ex: Courses, Salaire...)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            item {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Libellé (ex: Courses, Salaire...)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
 
-            OutlinedTextField(
-                value = amountText,
-                onValueChange = { amountText = it },
-                label = { Text("Montant (€)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            item {
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Montant (€)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
 
             // --- SÉLECTION DES CATÉGORIES (DIFFÉRENTE SI DÉPENSE OU RECETTE) ---
             if (type == "EXPENSE") {
-                // 1. Grande famille (Vital, Confort, Superficiel)
-                ExposedDropdownMenuBox(
-                    expanded = expandedFamily,
-                    onExpandedChange = { expandedFamily = !expandedFamily }
-                ) {
-                    OutlinedTextField(
-                        value = familyCategory,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Grande famille de dépense") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                    )
-                    ExposedDropdownMenu(
+                item {
+                    ExposedDropdownMenuBox(
                         expanded = expandedFamily,
-                        onDismissRequest = { expandedFamily = false }
+                        onExpandedChange = { expandedFamily = !expandedFamily }
                     ) {
-                        transactionCategories.forEach { family ->
-                            DropdownMenuItem(
-                                text = { Text(family.name, fontWeight = FontWeight.Bold) },
-                                onClick = {
-                                    familyCategory = family.name
-                                    subCategory = family.subCategories.firstOrNull() ?: ""
-                                    expandedFamily = false
-                                }
-                            )
+                        OutlinedTextField(
+                            value = familyCategory,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Grande famille de dépense") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedFamily,
+                            onDismissRequest = { expandedFamily = false }
+                        ) {
+                            transactionCategories.forEach { family ->
+                                DropdownMenuItem(
+                                    text = { Text(family.name, fontWeight = FontWeight.Bold) },
+                                    onClick = {
+                                        familyCategory = family.name
+                                        subCategory = family.subCategories.firstOrNull() ?: ""
+                                        expandedFamily = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
-                // 2. Sous-catégorie dynamique selon la famille choisie
-                val currentFamilyObj = transactionCategories.find { it.name == familyCategory }
-                val availableSubCategories = currentFamilyObj?.subCategories ?: emptyList()
+                item {
+                    val currentFamilyObj = transactionCategories.find { it.name == familyCategory }
+                    val availableSubCategories = currentFamilyObj?.subCategories ?: emptyList()
 
-                ExposedDropdownMenuBox(
-                    expanded = expandedSubCategory,
-                    onExpandedChange = { expandedSubCategory = !expandedSubCategory }
-                ) {
-                    OutlinedTextField(
-                        value = subCategory,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Sous-catégorie") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                    )
-                    ExposedDropdownMenu(
+                    ExposedDropdownMenuBox(
                         expanded = expandedSubCategory,
-                        onDismissRequest = { expandedSubCategory = false }
+                        onExpandedChange = { expandedSubCategory = !expandedSubCategory }
                     ) {
-                        availableSubCategories.forEach { sub ->
-                            DropdownMenuItem(
-                                text = { Text(sub) },
-                                onClick = {
-                                    subCategory = sub
-                                    expandedSubCategory = false
-                                }
-                            )
+                        OutlinedTextField(
+                            value = subCategory,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Sous-catégorie") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedSubCategory,
+                            onDismissRequest = { expandedSubCategory = false }
+                        ) {
+                            availableSubCategories.forEach { sub ->
+                                DropdownMenuItem(
+                                    text = { Text(sub) },
+                                    onClick = {
+                                        subCategory = sub
+                                        expandedSubCategory = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             } else {
-                // Pour les Recettes, liste simple de sous-catégories
+                item {
+                    ExposedDropdownMenuBox(
+                        expanded = expandedSubCategory,
+                        onExpandedChange = { expandedSubCategory = !expandedSubCategory }
+                    ) {
+                        OutlinedTextField(
+                            value = subCategory,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Catégorie de recette") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedSubCategory,
+                            onDismissRequest = { expandedSubCategory = false }
+                        ) {
+                            incomeCategories.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat) },
+                                    onClick = {
+                                        subCategory = cat
+                                        expandedSubCategory = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
                 ExposedDropdownMenuBox(
-                    expanded = expandedSubCategory,
-                    onExpandedChange = { expandedSubCategory = !expandedSubCategory }
+                    expanded = expandedPayment,
+                    onExpandedChange = { expandedPayment = !expandedPayment }
                 ) {
                     OutlinedTextField(
-                        value = subCategory,
+                        value = paymentMethod,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Catégorie de recette") },
+                        label = { Text("Source des fonds / Paiement") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                     )
                     ExposedDropdownMenu(
-                        expanded = expandedSubCategory,
-                        onDismissRequest = { expandedSubCategory = false }
+                        expanded = expandedPayment,
+                        onDismissRequest = { expandedPayment = false }
                     ) {
-                        incomeCategories.forEach { cat ->
+                        paymentMethods.forEach { method ->
                             DropdownMenuItem(
-                                text = { Text(cat) },
+                                text = { Text(method) },
                                 onClick = {
-                                    subCategory = cat
-                                    expandedSubCategory = false
+                                    paymentMethod = method
+                                    expandedPayment = false
                                 }
                             )
                         }
@@ -228,76 +273,15 @@ fun AddTransactionBottomSheet(
                 }
             }
 
-            ExposedDropdownMenuBox(
-                expanded = expandedPayment,
-                onExpandedChange = { expandedPayment = !expandedPayment }
-            ) {
-                OutlinedTextField(
-                    value = paymentMethod,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Source des fonds / Paiement") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                )
-                ExposedDropdownMenu(
-                    expanded = expandedPayment,
-                    onDismissRequest = { expandedPayment = false }
-                ) {
-                    paymentMethods.forEach { method ->
-                        DropdownMenuItem(
-                            text = { Text(method) },
-                            onClick = {
-                                paymentMethod = method
-                                expandedPayment = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            OutlinedButton(
-                onClick = {
-                    val cal = Calendar.getInstance().apply { time = selectedDate }
-                    DatePickerDialog(
-                        context,
-                        { _, year, month, dayOfMonth ->
-                            val newCal = Calendar.getInstance().apply { set(year, month, dayOfMonth) }
-                            selectedDate = newCal.time
-                        },
-                        cal.get(Calendar.YEAR),
-                        cal.get(Calendar.MONTH),
-                        cal.get(Calendar.DAY_OF_MONTH)
-                    ).show()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = "Date : ${dateFormat.format(selectedDate)}")
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Opération récurrente (mensuelle)")
-                Switch(
-                    checked = isRecurring,
-                    onCheckedChange = { isRecurring = it }
-                )
-            }
-
-            if (isRecurring) {
+            item {
                 OutlinedButton(
                     onClick = {
-                        val baseDate = endDate ?: Date()
-                        val cal = Calendar.getInstance().apply { time = baseDate }
+                        val cal = Calendar.getInstance().apply { time = selectedDate }
                         DatePickerDialog(
                             context,
                             { _, year, month, dayOfMonth ->
                                 val newCal = Calendar.getInstance().apply { set(year, month, dayOfMonth) }
-                                endDate = newCal.time
+                                selectedDate = newCal.time
                             },
                             cal.get(Calendar.YEAR),
                             cal.get(Calendar.MONTH),
@@ -306,47 +290,87 @@ fun AddTransactionBottomSheet(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = if (endDate != null) "Date de fin : ${dateFormat.format(endDate!!)}" else "Pas de date de fin (Infini)")
+                    Text(text = "Date : ${dateFormat.format(selectedDate)}")
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Opération récurrente (mensuelle)")
+                    Switch(
+                        checked = isRecurring,
+                        onCheckedChange = { isRecurring = it }
+                    )
+                }
+            }
+
+            if (isRecurring) {
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            val baseDate = endDate ?: Date()
+                            val cal = Calendar.getInstance().apply { time = baseDate }
+                            DatePickerDialog(
+                                context,
+                                { _, year, month, dayOfMonth ->
+                                    val newCal = Calendar.getInstance().apply { set(year, month, dayOfMonth) }
+                                    endDate = newCal.time
+                                },
+                                cal.get(Calendar.YEAR),
+                                cal.get(Calendar.MONTH),
+                                cal.get(Calendar.DAY_OF_MONTH)
+                            ).show()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = if (endDate != null) "Date de fin : ${dateFormat.format(endDate!!)}" else "Pas de date de fin (Infini)")
+                    }
                 }
 
                 if (endDate != null) {
-                    TextButton(
-                        onClick = { endDate = null },
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Effacer la date de fin (Infini)")
+                    item {
+                        TextButton(
+                            onClick = { endDate = null },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Effacer la date de fin (Infini)")
+                        }
                     }
                 }
             }
 
-            Button(
-                onClick = {
-                    val rawAmount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    val finalAmount = if (type == "EXPENSE") -abs(rawAmount) else abs(rawAmount)
-                    val finalFamily = if (type == "INCOME") "Recettes" else familyCategory
+            item {
+                Button(
+                    onClick = {
+                        val rawAmount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val finalAmount = if (type == "EXPENSE") -abs(rawAmount) else abs(rawAmount)
+                        val finalFamily = if (type == "INCOME") "Recettes" else familyCategory
 
-                    if (title.isNotBlank() && rawAmount != 0.0) {
-                        onSave(
-                            title,
-                            finalAmount,
-                            finalFamily,
-                            subCategory,
-                            type,
-                            paymentMethod,
-                            Timestamp(selectedDate),
-                            isRecurring,
-                            if (isRecurring) "MONTHLY" else null,
-                            if (isRecurring && endDate != null) Timestamp(endDate!!) else null
-                        )
-                        onDismiss()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (initialTransaction == null) "Enregistrer" else "Modifier")
+                        if (title.isNotBlank() && rawAmount != 0.0) {
+                            onSave(
+                                title,
+                                finalAmount,
+                                finalFamily,
+                                subCategory,
+                                type,
+                                paymentMethod,
+                                Timestamp(selectedDate),
+                                isRecurring,
+                                if (isRecurring) "MONTHLY" else null,
+                                if (isRecurring && endDate != null) Timestamp(endDate!!) else null
+                            )
+                            onDismiss()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (initialTransaction == null) "Enregistrer" else "Modifier")
+                }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
