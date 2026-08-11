@@ -3,14 +3,18 @@ package com.example.kaptal.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
@@ -64,19 +68,33 @@ fun StandardAccountScreen(
     val baseYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
     val baseMonth = remember { Calendar.getInstance().get(Calendar.MONTH) }
 
-    // Box racine pour superposer l'image de fond et le contenu de l'application
-    Box(modifier = Modifier.fillMaxSize()) {
-        // --- 1. IMAGE DE FOND (PLAN TECHNIQUE & LOGO KAPTAL) ---
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE8ECEF))
+    ) {
+        // --- 1. IMAGE DE FOND ---
         Image(
-            painter = painterResource(id = R.drawable.fond_kaptal),
-            contentDescription = "Fond d'écran Kaptal",
+            painter = painterResource(id = R.drawable.fond_kaptal_propre),
+            contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            alpha = 0.3f
         )
 
-        // --- 2. CONTENU DE L'ÉCRAN ---
+        // --- 2. LOGO K VECTORIEL CENTRÉ ---
+        Image(
+            painter = painterResource(id = R.drawable.ic_kaptal_logo),
+            contentDescription = "Logo K Kaptal",
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .align(Alignment.Center),
+            contentScale = ContentScale.Fit
+        )
+
+        // --- 3. CONTENU DE L'ÉCRAN ---
         Scaffold(
-            containerColor = Color.Transparent, // Transparent pour laisser voir le fond
+            containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
                     title = { Text(account.name, fontWeight = FontWeight.Bold) },
@@ -85,36 +103,30 @@ fun StandardAccountScreen(
                             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                         }
                     },
+                    actions = {
+                        // Bouton Infos (Répartition) harmonisé en haut à droite
+                        IconButton(onClick = { showChartSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Répartition par catégorie",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        // Bouton Ajouter (+) harmonisé en haut à droite
+                        IconButton(onClick = { showAddSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Ajouter une opération",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
-            },
-            floatingActionButton = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    FloatingActionButton(
-                        onClick = { showChartSheet = true },
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ) {
-                        Icon(imageVector = Icons.Default.Info, contentDescription = "Répartition par catégorie")
-                    }
-
-                    FloatingActionButton(
-                        onClick = { showAddSheet = true },
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Ajouter une opération")
-                    }
-                }
-            },
-            floatingActionButtonPosition = FabPosition.Center
+            }
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -647,7 +659,7 @@ private fun computeCumulativeBalance(
 
 @Composable
 fun getCategoryPastelColor(family: String): Color {
-    return Color.White.copy(alpha = 0.9f) // Légèrement transparent pour fondre avec l'arrière-plan
+    return Color.White.copy(alpha = 0.9f)
 }
 
 @Composable
@@ -739,21 +751,20 @@ fun TransactionItem(
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
                         .width(6.dp)
-                        .fillMaxHeight()
+                        .height(48.dp)
                         .background(getCategoryIndicatorColor(transaction.familyCategory))
                 )
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                        .padding(vertical = 8.dp, horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -761,13 +772,35 @@ fun TransactionItem(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = onCheckedChange,
-                            modifier = Modifier.size(36.dp)
-                        )
+                        // Case à cocher seule réduite (22dp) avec fond neutre discret et icône foncée
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .background(
+                                    color = if (isChecked) Color(0xFFE0E0E0) else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = 1.5.dp,
+                                    color = if (isChecked) Color(0xFF9E9E9E) else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                                    shape = CircleShape
+                                )
+                                .clickable(
+                                    onClick = { onCheckedChange(!isChecked) }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isChecked) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Coché",
+                                    tint = Color(0xFF424242),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
 
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Text(
                             text = transaction.title,
@@ -782,7 +815,7 @@ fun TransactionItem(
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (transaction.amount >= 0) positiveColor else negativeColor,
-                        modifier = Modifier.padding(end = 12.dp)
+                        modifier = Modifier.padding(end = 4.dp)
                     )
                 }
             }
@@ -792,8 +825,9 @@ fun TransactionItem(
 
 fun getMonthName(year: Int, month: Int): String {
     val cal = Calendar.getInstance().apply {
-        set(year, month, 1)
+        set(Calendar.YEAR, year)
+        set(Calendar.MONTH, month)
     }
-    val formatter = SimpleDateFormat("MMMM yyyy", Locale.FRENCH)
+    val formatter = SimpleDateFormat("MMMM yyyy", Locale.FRANCE)
     return formatter.format(cal.time).replaceFirstChar { it.uppercase() }
 }

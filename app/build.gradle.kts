@@ -82,4 +82,7 @@ dependencies {
 
     // Navigation Jetpack Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    dependencies { implementation("androidx.compose.ui:ui-text-google-fonts:1.7.0") // Vérifie la dernière version
+    }
 }
