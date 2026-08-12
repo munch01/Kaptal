@@ -35,9 +35,9 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun KaptalTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Force le mode clair
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false, // Désactive les couleurs dynamiques pour garder le contrôle sur le design
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

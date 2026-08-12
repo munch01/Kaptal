@@ -78,6 +78,10 @@ dependencies {
     // Navigation Jetpack Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
+    // Google Play App Update
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
+
     // PDF Parsing
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 

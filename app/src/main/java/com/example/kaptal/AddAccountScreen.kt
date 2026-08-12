@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,13 +35,15 @@ fun AddAccountScreen(
     var bankName by remember { mutableStateOf("") }
     var initialBalance by remember { mutableStateOf("") }
 
-    // Types de comptes épurés (uniquement Courant, Épargne, Livret A et Espèces)
-    val accountTypes = listOf(
-        stringResource(R.string.account_type_checking),
-        stringResource(R.string.account_type_savings),
-        stringResource(R.string.account_type_livret_a),
-        stringResource(R.string.account_type_cash)
-    )
+    val typeChecking = stringResource(R.string.account_type_checking)
+    val typeSavings = stringResource(R.string.account_type_savings)
+    val typeLivretA = stringResource(R.string.account_type_livret_a)
+    val typeCredit = stringResource(R.string.account_type_credit)
+    val typeCrypto = stringResource(R.string.account_type_crypto)
+    val typeCash = stringResource(R.string.account_type_cash)
+
+    // Types de comptes complets
+    val accountTypes = listOf(typeChecking, typeSavings, typeLivretA, typeCredit, typeCrypto, typeCash)
     var selectedType by remember { mutableStateOf(accountTypes[0]) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -155,11 +158,19 @@ fun AddAccountScreen(
                     balanceError = parsedBalance == null
 
                     if (!nameError && !balanceError) {
+                        val typeKey = when (selectedType) {
+                            typeSavings -> "SAVINGS"
+                            typeLivretA -> "LIVRET_A"
+                            typeCredit -> "CREDIT"
+                            typeCrypto -> "CRYPTO"
+                            typeCash -> "CASH"
+                            else -> "CHECKING"
+                        }
                         onAccountAdded(
                             accountName.trim(),
                             bankName.trim(),
                             parsedBalance ?: 0.0,
-                            selectedType,
+                            typeKey,
                             false,
                             "#2196F3"
                         )

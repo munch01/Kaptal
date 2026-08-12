@@ -58,7 +58,11 @@ fun HomeScreen(
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
     var accountToDelete by remember { mutableStateOf<Account?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE8ECEF))
+    ) {
         // 1. Fond général
         Image(
             painter = painterResource(id = R.drawable.fond_kaptal_propre),
@@ -441,24 +445,23 @@ fun AccountFormDialog(
                 OutlinedTextField(value = bankName, onValueChange = { bankName = it }, label = { Text(stringResource(R.string.account_bank_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                 Text(stringResource(R.string.account_type_label), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val accountTypes = listOf(
-                        "CHECKING" to stringResource(R.string.account_type_checking),
-                        "SAVINGS" to stringResource(R.string.account_type_savings),
-                        "LIVRET_A" to stringResource(R.string.account_type_livret_a),
-                        "CREDIT" to stringResource(R.string.account_type_credit),
-                        "CRYPTO" to stringResource(R.string.account_type_crypto)
-                    )
-                    accountTypes.chunked(3).forEach { rowTypes ->
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowTypes.forEach { (typeKey, typeLabel) ->
-                                FilterChip(
-                                    modifier = Modifier.weight(1f),
-                                    selected = selectedType == typeKey,
-                                    onClick = { selectedType = typeKey },
-                                    label = { Text(typeLabel, maxLines = 1) }
-                                )
-                            }
+                val accountTypes = listOf(
+                    "CHECKING" to stringResource(R.string.account_type_checking),
+                    "SAVINGS" to stringResource(R.string.account_type_savings),
+                    "LIVRET_A" to stringResource(R.string.account_type_livret_a),
+                    "CREDIT" to stringResource(R.string.account_type_credit),
+                    "CRYPTO" to stringResource(R.string.account_type_crypto),
+                    "CASH" to stringResource(R.string.account_type_cash)
+                )
+                accountTypes.chunked(3).forEach { rowTypes ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowTypes.forEach { (typeKey, typeLabel) ->
+                            FilterChip(
+                                modifier = Modifier.weight(1f),
+                                selected = selectedType == typeKey,
+                                onClick = { selectedType = typeKey },
+                                label = { Text(typeLabel, maxLines = 1) }
+                            )
                         }
                     }
                 }

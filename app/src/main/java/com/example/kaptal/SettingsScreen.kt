@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -49,7 +50,11 @@ fun SettingsScreen(
     val availableCurrencies = listOf("EUR (€)", "USD ($)", "GBP (£)")
     val availableLanguages = listOf("Français", "English", "Español")
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE8ECEF))
+    ) {
         // 1. Fond général
         Image(
             painter = painterResource(id = R.drawable.fond_kaptal_propre),

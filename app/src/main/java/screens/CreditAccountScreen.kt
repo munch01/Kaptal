@@ -1,6 +1,7 @@
 package com.example.kaptal.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,7 +38,11 @@ fun CreditAccountScreen(
     val linkedAccount = allAccounts.find { it.id == account.linkedAccountId }
     var showSetupDialog by remember { mutableStateOf(false) }
     
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFE8ECEF))
+    ) {
         // 1. Fond général
         Image(
             painter = painterResource(id = R.drawable.fond_kaptal_propre),

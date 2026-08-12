@@ -98,17 +98,13 @@ class MainViewModel : ViewModel() {
                     val csvText = url.readText()
                     val lines = csvText.split("\n")
                     if (lines.size > 1) {
-                        // On prend la dernière ligne non vide (souvent la plus récente)
-                        // ou la deuxième si c'est trié par date DESC
                         val dataLine = lines.filter { it.isNotBlank() }.last()
                         val columns = dataLine.split(";")
-                        // Structure supposée : date;taux_la;taux_ldds;taux_lep
                         columns[1].replace(",", ".").toDoubleOrNull() ?: 3.0
                     } else 3.0
                 }
                 _livretARate.value = rate
             } catch (e: Exception) {
-                // Fallback à 3% en cas d'erreur réseau
                 _livretARate.value = 3.0
             }
         }

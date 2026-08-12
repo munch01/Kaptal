@@ -202,6 +202,8 @@
     <string name="delete_label">Eliminar</string>
     <string name="close_label">Cerrar</string>
     <string name="validate">Validar</string>
+    <string name="pin_title">Código PIN</string>
+    <string name="pin_error">Error de PIN</string>
 
     <!-- Backup Section -->
     <string name="section_backup">Datos y Copia de seguridad</string>

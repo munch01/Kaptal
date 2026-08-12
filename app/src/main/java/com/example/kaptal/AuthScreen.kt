@@ -3,6 +3,7 @@ package com.example.kaptal
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -73,7 +74,9 @@ fun AuthScreen(
     }
 
     Box(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFE8ECEF))
     ) {
         // 1. Fond général
         Image(
@@ -110,7 +113,7 @@ fun AuthScreen(
             Image(
                 painter = painterResource(id = R.drawable.ic_kaptal_logo),
                 contentDescription = "Logo Kaptal",
-                modifier = Modifier.height(80.dp),
+                modifier = Modifier.size(120.dp),
                 contentScale = ContentScale.Fit
             )
 
@@ -121,7 +124,7 @@ fun AuthScreen(
                     text = stringResource(R.string.auth_signup_title),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = Color.Black
                 )
                 Spacer(modifier = Modifier.height(24.dp))
             }
