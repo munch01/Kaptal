@@ -44,378 +44,60 @@ class MainActivity : FragmentActivity() {
         val prefs = newBase.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
         super.attachBaseContext(LocaleHelper.setLocale(newBase, lang))
-        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
     }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Forcer la langue au niveau de la configuration locale de l'activité
+        appUpdateManager = AppUpdateManagerFactory.create(this)
+        checkForUpdates()
+
         val prefs = getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
         LocaleHelper.setLocale(this, lang)
 
         setContent {
             KaptalTheme {
-                // Utilisation d'un CompositionLocal pour forcer la langue dans Compose
                 val context = LocalContext.current
-                val locale = when (lang) {
-                    "English" -> Locale.ENGLISH
-                    "Español" -> Locale("es")
-                    else -> Locale.FRENCH
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                
                 CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides LocaleHelper.setLocale(context, lang)) {
-                    var showSplash by remember { mutableStateOf(true)     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
+                    var showSplash by remember { mutableStateOf(true) }
 
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-
-                    // Timer pour laisser afficher le Splash Screen personnalisé (ex: 1.2 secondes)
                     LaunchedEffect(Unit) {
                         delay(1200)
                         showSplash = false
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                    }
 
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
                         if (showSplash) {
-                            // Écran de démarrage personnalisé en plein écran
                             Box(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                // 1. Ton fond personnalisé en plein écran
                                 Image(
                                     painter = painterResource(id = R.drawable.fond_kaptal_propre),
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
-
-                                // 2. Ton logo par-dessus (ajuste la taille selon tes préférences)
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_k_logo),
                                     contentDescription = "Logo Kaptal",
                                     modifier = Modifier.size(160.dp),
                                     contentScale = ContentScale.Fit
                                 )
-                                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                            }
                         } else {
-                            // Application principale
                             KaptalApp(activity = this@MainActivity)
-                            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
+                        }
+                    }
+                }
             }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
     private fun checkForUpdates() {
         appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
             if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
@@ -452,158 +134,17 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
     val auth = FirebaseAuth.getInstance()
     val context = activity.applicationContext
 
-    // Surveillance du changement de langue pour recréer l'activité
     LaunchedEffect(Unit) {
         settingsViewModel.languageChangedEvent.collect {
             activity.recreate()
-            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-
-    val prefs = remember { context.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-    val isBiometricEnabled = remember { prefs.getBoolean("biometric_enabled", false)     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+    val prefs = remember { context.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE) }
+    val isBiometricEnabled = remember { prefs.getBoolean("biometric_enabled", false) }
     val hasSession = auth.currentUser != null
 
-    var isUnlocked by remember { mutableStateOf(!hasSession || !isBiometricEnabled)     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+    var isUnlocked by remember { mutableStateOf(!hasSession || !isBiometricEnabled) }
 
     LaunchedEffect(Unit) {
         if (hasSession && isBiometricEnabled) {
@@ -612,94 +153,10 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                 onSuccess = { isUnlocked = true },
                 onError = {
                     Toast.makeText(context, context.getString(R.string.biometric_error_required), Toast.LENGTH_SHORT).show()
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                }
             )
-            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
     val startDestination = if (hasSession) "home" else "auth"
 
@@ -712,123 +169,11 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                 AuthScreen(
                     onAuthSuccess = {
                         navController.navigate("home") {
-                            popUpTo("auth") { inclusive = true     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
+                            popUpTo("auth") { inclusive = true }
+                        }
+                    }
                 )
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                )
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
             composable("home") {
                 HomeScreen(
@@ -842,222 +187,26 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                             "CREDIT" -> navController.navigate("credit_detail")
                             "LIVRET_A" -> navController.navigate("livret_a_detail")
                             else -> navController.navigate("standard_detail")
-                            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
+                        }
+                    }
                 )
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                )
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
             composable("crypto") {
                 CryptoScreen(
                     onBackClick = {
                         navController.popBackStack()
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
+                    }
                 )
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                )
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
             composable("settings") {
                 SettingsScreen(
                     onBackClick = {
                         navController.popBackStack()
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
+                    }
                 )
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                )
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
             composable("standard_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
@@ -1072,94 +221,10 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                         onPageChanged = { page ->
                             viewModel.savePagerPosition(acc.id, page)
                         },
-                        onBackClick = { navController.popBackStack()     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                        onBackClick = { navController.popBackStack() }
                     )
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
+                }
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
             composable("credit_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
@@ -1170,94 +235,10 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                     CreditAccountScreen(
                         account = it,
                         allAccounts = allAccounts,
-                        onBackClick = { navController.popBackStack()     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                        onBackClick = { navController.popBackStack() }
                     )
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
+                }
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
             composable("livret_a_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
@@ -1272,123 +253,11 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                         onPageChanged = { page ->
                             viewModel.savePagerPosition(acc.id, page)
                         },
-                        onBackClick = { navController.popBackStack()     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                        onBackClick = { navController.popBackStack() }
                     )
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
+                }
             }
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 
         if (!isUnlocked) {
             Surface(
@@ -1418,69 +287,13 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                                 triggerAppUnlockBiometric(
                                     activity = activity,
                                     onSuccess = { isUnlocked = true },
-                                    onError = {     private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                                    onError = { }
                                 )
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.lock_unlock_button))
-                            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                        }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1492,205 +305,9 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.lock_use_password_button))
-                            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-            private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
+                        }
+                    }
+                }
             }
         }
     }
@@ -1712,97 +329,13 @@ private fun triggerAppUnlockBiometric(
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
                     onSuccess()
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
+                }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
                     onError()
-                    private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
+                }
             }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
-                private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -1814,33 +347,5 @@ private fun triggerAppUnlockBiometric(
         biometricPrompt.authenticate(promptInfo)
     } else {
         onSuccess()
-        private fun checkForUpdates() {
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                && info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
-            ) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
     }
-
-    override fun onResume() {
-        super.onResume()
-        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
-            if (info.updateAvailability() == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS) {
-                appUpdateManager.startUpdateFlowForResult(
-                    info,
-                    AppUpdateType.IMMEDIATE,
-                    this,
-                    updateRequestCode
-                )
-            }
-        }
-    }
-}
 }
