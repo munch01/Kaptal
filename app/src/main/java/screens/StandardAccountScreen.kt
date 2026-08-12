@@ -22,16 +22,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kaptal.R
 import com.example.kaptal.model.Account
 import com.example.kaptal.model.Transaction
 import com.example.kaptal.viewmodel.AccountDetailViewModel
+import com.example.kaptal.viewmodel.RecurrenceEditScope
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -49,8 +53,9 @@ fun StandardAccountScreen(
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showChartSheet by remember { mutableStateOf(false) }
-    var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
+    var transactionToEdit by remember { mutableStateOf<Pair<Transaction, Pair<Timestamp?, RecurrenceEditScope>>?>(null) }
     var transactionToDelete by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
+    var showEditChoiceDialog by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
 
     LaunchedEffect(account.id) {
         viewModel.loadTransactions(account.id)
@@ -73,7 +78,7 @@ fun StandardAccountScreen(
             .fillMaxSize()
             .background(Color(0xFFE8ECEF))
     ) {
-        // --- 1. IMAGE DE FOND ---
+        // 1. Fond général
         Image(
             painter = painterResource(id = R.drawable.fond_kaptal_propre),
             contentDescription = null,
@@ -82,29 +87,41 @@ fun StandardAccountScreen(
             alpha = 0.3f
         )
 
-        // --- 2. LOGO K VECTORIEL CENTRÉ ---
-        Image(
-            painter = painterResource(id = R.drawable.ic_kaptal_logo),
-            contentDescription = "Logo K Kaptal",
+        // 2. Logo central en filigrane (replacé ici pour ne plus être masqué)
+        Box(
             modifier = Modifier
-                .fillMaxWidth(0.8f)
-                .align(Alignment.Center),
-            contentScale = ContentScale.Fit
-        )
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_kaptal_logo),
+                contentDescription = "Logo K Kaptal",
+                modifier = Modifier.fillMaxWidth(0.9f),
+                contentScale = ContentScale.Fit,
+                alpha = 0.75f
+            )
+        }
 
-        // --- 3. CONTENU DE L'ÉCRAN ---
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text(account.name, fontWeight = FontWeight.Bold) },
+                    title = {
+                        Text(
+                            text = account.name,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                         }
                     },
                     actions = {
-                        // Bouton Infos (Répartition) harmonisé en haut à droite
                         IconButton(onClick = { showChartSheet = true }) {
                             Icon(
                                 imageVector = Icons.Default.Info,
@@ -112,7 +129,6 @@ fun StandardAccountScreen(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        // Bouton Ajouter (+) harmonisé en haut à droite
                         IconButton(onClick = { showAddSheet = true }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
@@ -153,7 +169,16 @@ fun StandardAccountScreen(
                             viewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
                         },
                         onEditClick = { transaction ->
-                            transactionToEdit = transaction
+                            val targetCal = Calendar.getInstance().apply {
+                                set(year, month, 1, 0, 0, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            val effectiveTimestamp = Timestamp(targetCal.time)
+                            if (transaction.isRecurring) {
+                                showEditChoiceDialog = Pair(transaction, effectiveTimestamp)
+                            } else {
+                                transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
+                            }
                         },
                         onDeleteClick = { transaction ->
                             val targetCal = Calendar.getInstance().apply {
@@ -183,42 +208,151 @@ fun StandardAccountScreen(
         )
     }
 
+    showEditChoiceDialog?.let { (transaction, effectiveDate) ->
+        AlertDialog(
+            onDismissRequest = { showEditChoiceDialog = null },
+            title = { Text("Modifier l'opération récurrente") },
+            text = { Text("Comment souhaitez-vous appliquer cette modification sur la récurrence ?") },
+            confirmButton = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(
+                        onClick = {
+                            showEditChoiceDialog = null
+                            transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Toute la série")
+                    }
+                    TextButton(
+                        onClick = {
+                            showEditChoiceDialog = null
+                            transactionToEdit = Pair(transaction, Pair(effectiveDate, RecurrenceEditScope.THIS_AND_FUTURE))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Ce mois et les futurs")
+                    }
+                    TextButton(
+                        onClick = {
+                            showEditChoiceDialog = null
+                            transactionToEdit = Pair(transaction, Pair(effectiveDate, RecurrenceEditScope.THIS_ONLY))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cette occurrence uniquement")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = { showEditChoiceDialog = null },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Annuler", color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        )
+    }
+
     transactionToDelete?.let { (transaction, effectiveDate) ->
         val isRecurringSeries = transaction.isRecurring
 
         AlertDialog(
             onDismissRequest = { transactionToDelete = null },
             title = {
-                Text(
-                    text = if (isRecurringSeries) "Supprimer la récurrence" else "Supprimer l'opération"
-                )
+                Text(text = if (isRecurringSeries) "Supprimer la récurrence" else "Supprimer l'opération")
             },
             text = {
                 Text(
                     text = if (isRecurringSeries) {
-                        "Cette opération est récurrente. Voulez-vous arrêter la récurrence à partir de ce mois ?"
+                        "Cette opération est récurrente. Voulez-vous supprimer toute la série, seulement à partir de ce mois, ou juste ce mois-ci ?"
                     } else {
                         "Voulez-vous vraiment supprimer l'opération \"${transaction.title}\" ?"
                     }
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteTransaction(
-                            accountId = account.id,
-                            transaction = transaction,
-                            effectiveDeleteDate = effectiveDate
-                        )
-                        transactionToDelete = null
+                if (isRecurringSeries) {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteRecurringTransactionWithScope(
+                                    accountId = account.id,
+                                    transaction = transaction,
+                                    effectiveDate = effectiveDate,
+                                    scope = RecurrenceEditScope.ALL
+                                )
+                                transactionToDelete = null
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Toute la série", color = MaterialTheme.colorScheme.error)
+                        }
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteRecurringTransactionWithScope(
+                                    accountId = account.id,
+                                    transaction = transaction,
+                                    effectiveDate = effectiveDate,
+                                    scope = RecurrenceEditScope.THIS_AND_FUTURE
+                                )
+                                transactionToDelete = null
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("À partir de ce mois-ci", color = MaterialTheme.colorScheme.error)
+                        }
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteRecurringTransactionWithScope(
+                                    accountId = account.id,
+                                    transaction = transaction,
+                                    effectiveDate = effectiveDate,
+                                    scope = RecurrenceEditScope.THIS_ONLY
+                                )
+                                transactionToDelete = null
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Ce mois uniquement", color = MaterialTheme.colorScheme.error)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        TextButton(
+                            onClick = { transactionToDelete = null },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Annuler", color = MaterialTheme.colorScheme.outline)
+                        }
                     }
-                ) {
-                    Text("Supprimer", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { transactionToDelete = null }) {
-                    Text("Annuler")
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { transactionToDelete = null }) {
+                            Text("Annuler")
+                        }
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteTransaction(
+                                    accountId = account.id,
+                                    transaction = transaction,
+                                    effectiveDeleteDate = effectiveDate
+                                )
+                                transactionToDelete = null
+                            }
+                        ) {
+                            Text("Supprimer", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 }
             }
         )
@@ -238,7 +372,7 @@ fun StandardAccountScreen(
                     date = date,
                     checkedMonths = emptyList(),
                     isRecurring = isRecurring,
-                    recurrenceInterval = recurrenceInterval,
+                    recurrenceInterval = recurrenceInterval ?: "Mensuel",
                     endDate = endDate
                 )
                 viewModel.addTransaction(account.id, newTransaction)
@@ -246,24 +380,44 @@ fun StandardAccountScreen(
         )
     }
 
-    transactionToEdit?.let { transaction ->
+    transactionToEdit?.let { (transaction, editInfo) ->
+        val (effectiveDate, scope) = editInfo
         AddTransactionBottomSheet(
             initialTransaction = transaction,
             onDismiss = { transactionToEdit = null },
             onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
-                val updatedTransaction = transaction.copy(
-                    title = title,
-                    amount = amount,
-                    familyCategory = familyCategory,
-                    subCategory = subCategory,
-                    type = type,
-                    paymentMethod = paymentMethod,
-                    date = date,
-                    isRecurring = isRecurring,
-                    recurrenceInterval = recurrenceInterval,
-                    endDate = endDate
-                )
-                viewModel.updateTransaction(account.id, updatedTransaction)
+                if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
+                    viewModel.updateRecurringTransactionWithScope(
+                        accountId = account.id,
+                        oldTransaction = transaction,
+                        newTitle = title,
+                        newAmount = amount,
+                        newFamilyCategory = familyCategory,
+                        newSubCategory = subCategory,
+                        newType = type,
+                        newPaymentMethod = paymentMethod,
+                        newDate = date,
+                        newIsRecurring = isRecurring,
+                        newRecurrenceInterval = recurrenceInterval ?: "Mensuel",
+                        newEndDate = endDate,
+                        effectiveDate = effectiveDate,
+                        scope = scope
+                    )
+                } else {
+                    val updatedTransaction = transaction.copy(
+                        title = title,
+                        amount = amount,
+                        familyCategory = familyCategory,
+                        subCategory = subCategory,
+                        type = type,
+                        paymentMethod = paymentMethod,
+                        date = date,
+                        isRecurring = isRecurring,
+                        recurrenceInterval = recurrenceInterval ?: transaction.recurrenceInterval,
+                        endDate = endDate
+                    )
+                    viewModel.updateTransaction(account.id, updatedTransaction)
+                }
                 transactionToEdit = null
             }
         )
@@ -285,12 +439,12 @@ fun CategoryDistributionDialog(
         val expenses = activeTransactions.filter { it.amount < 0 }
         val totalExp = expenses.sumOf { kotlin.math.abs(it.amount) }
 
-        expenses.groupBy { it.familyCategory.ifEmpty { "Autre" } }
+        expenses.groupBy { it.familyCategory?.ifEmpty { "Autre" } ?: "Autre" }
             .map { (family, familyTxList) ->
                 val familyTotal = familyTxList.sumOf { kotlin.math.abs(it.amount) }
                 val familyPercentage = if (totalExp > 0) (familyTotal / totalExp) * 100 else 0.0
 
-                val subCategories = familyTxList.groupBy { it.subCategory.ifEmpty { "Autre" } }
+                val subCategories = familyTxList.groupBy { it.subCategory?.ifEmpty { "Autre" } ?: "Autre" }
                     .map { (sub, subTxList) ->
                         val subTotal = subTxList.sumOf { kotlin.math.abs(it.amount) }
                         val subPercentageOfFamily = if (familyTotal > 0) (subTotal / familyTotal) * 100 else 0.0
@@ -305,9 +459,7 @@ fun CategoryDistributionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text("Répartition par catégorie", fontWeight = FontWeight.Bold)
-        },
+        title = { Text("Répartition par catégorie", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -347,11 +499,7 @@ fun CategoryDistributionDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(
-                                        text = family,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Text(text = family, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                                     Text(
                                         text = "${String.format(Locale.FRANCE, "%.2f", familyAmount)} € (${String.format(Locale.FRANCE, "%.1f", familyPercentage)}%)",
                                         style = MaterialTheme.typography.titleSmall,
@@ -412,19 +560,12 @@ fun CategoryDistributionDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Fermer")
-            }
+            TextButton(onClick = onDismiss) { Text("Fermer") }
         }
     )
 }
 
-data class Quadruple<A, B, C, D>(
-    val first: A,
-    val second: B,
-    val third: C,
-    val fourth: D
-)
+data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 @Composable
 fun MonthPageContent(
@@ -487,10 +628,7 @@ fun MonthPageContent(
                 colors = CardDefaults.cardColors(
                     containerColor = if (realBalance >= 0) Color(0xFFF1F8F5).copy(alpha = 0.9f) else Color(0xFFFDF2F2).copy(alpha = 0.9f)
                 ),
-                border = BorderStroke(
-                    1.dp,
-                    if (realBalance >= 0) Color(0xFFD1E7DD) else Color(0xFFF8D7DA)
-                )
+                border = BorderStroke(1.dp, if (realBalance >= 0) Color(0xFFD1E7DD) else Color(0xFFF8D7DA))
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(text = "Solde Réel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -509,10 +647,7 @@ fun MonthPageContent(
                 colors = CardDefaults.cardColors(
                     containerColor = if (projectedBalance >= 0) Color(0xFFF1F8F5).copy(alpha = 0.9f) else Color(0xFFFDF2F2).copy(alpha = 0.9f)
                 ),
-                border = BorderStroke(
-                    1.dp,
-                    if (projectedBalance >= 0) Color(0xFFD1E7DD) else Color(0xFFF8D7DA)
-                )
+                border = BorderStroke(1.dp, if (projectedBalance >= 0) Color(0xFFD1E7DD) else Color(0xFFF8D7DA))
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(text = "Solde Projeté", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -544,10 +679,7 @@ fun MonthPageContent(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Aucune opération pour ce mois",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(text = "Aucune opération pour ce mois", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(
@@ -570,12 +702,8 @@ fun MonthPageContent(
                         onCheckedChange = { checked ->
                             onCheckedChange(transaction.id, monthKey, checked)
                         },
-                        onEditClick = {
-                            onEditClick(transaction)
-                        },
-                        onDeleteClick = {
-                            onDeleteClick(transaction)
-                        }
+                        onEditClick = { onEditClick(transaction) },
+                        onDeleteClick = { onDeleteClick(transaction) }
                     )
                 }
             }
@@ -594,7 +722,7 @@ private fun isTransactionActiveInMonth(tx: Transaction, year: Int, month: Int): 
     return if (tx.isRecurring) {
         val startsBeforeOrDuring = startIndex <= targetIndex
         val endsAfterOrDuring = if (tx.endDate != null) {
-            val endCal = Calendar.getInstance().apply { time = tx.endDate.toDate() }
+            val endCal = Calendar.getInstance().apply { time = tx.endDate!!.toDate() }
             val endIndex = endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
             targetIndex < endIndex
         } else {
@@ -658,29 +786,15 @@ private fun computeCumulativeBalance(
 }
 
 @Composable
-fun getCategoryPastelColor(family: String): Color {
-    return Color.White.copy(alpha = 0.9f)
-}
-
-@Composable
-fun getCategoryIndicatorColor(family: String): Color {
-    val cleanFamily = family.lowercase(Locale.ROOT).trim()
+fun getCategoryIndicatorColor(family: String?): Color {
+    val cleanFamily = family?.lowercase(Locale.ROOT)?.trim() ?: ""
     return when {
-        cleanFamily.contains("vital") || cleanFamily.contains("incompressible") ->
-            Color(0xFF2E7D32)
-        cleanFamily.contains("confort") || cleanFamily.contains("vie courante") ->
-            Color(0xFF1976D2)
-        cleanFamily.contains("superficiel") || cleanFamily.contains("plaisir") ->
-            Color(0xFFE65100)
-        cleanFamily.contains("salaire") || cleanFamily.contains("revenu") ->
-            Color(0xFF388E3C)
+        cleanFamily.contains("vital") || cleanFamily.contains("incompressible") -> Color(0xFF2E7D32)
+        cleanFamily.contains("confort") || cleanFamily.contains("vie courante") -> Color(0xFF1976D2)
+        cleanFamily.contains("superficiel") || cleanFamily.contains("plaisir") -> Color(0xFFE65100)
+        cleanFamily.contains("salaire") || cleanFamily.contains("revenu") -> Color(0xFF388E3C)
         else -> Color(0xFF9E9E9E)
     }
-}
-
-@Composable
-fun getCategoryBorderColor(family: String): Color {
-    return Color(0xFFE0E0E0)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -733,25 +847,20 @@ fun TransactionItem(
                     .padding(horizontal = 16.dp),
                 contentAlignment = alignment
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tint
-                )
+                Icon(imageVector = icon, contentDescription = null, tint = tint)
             }
         }
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = getCategoryPastelColor(transaction.familyCategory)
+                containerColor = Color.White.copy(alpha = 0.9f)
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            border = BorderStroke(1.dp, getCategoryBorderColor(transaction.familyCategory))
+            border = BorderStroke(1.dp, Color(0xFFE0E0E0))
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -764,58 +873,50 @@ fun TransactionItem(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp, horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Case à cocher seule réduite (22dp) avec fond neutre discret et icône foncée
+                        // Case à cocher vraiment ronde
                         Box(
                             modifier = Modifier
                                 .size(22.dp)
-                                .background(
-                                    color = if (isChecked) Color(0xFFE0E0E0) else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                                .border(
-                                    width = 1.5.dp,
-                                    color = if (isChecked) Color(0xFF9E9E9E) else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                                    shape = CircleShape
-                                )
-                                .clickable(
-                                    onClick = { onCheckedChange(!isChecked) }
-                                ),
+                                .clip(CircleShape)
+                                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                .background(if (isChecked) MaterialTheme.colorScheme.primary else Color.Transparent)
+                                .clickable { onCheckedChange(!isChecked) },
                             contentAlignment = Alignment.Center
                         ) {
                             if (isChecked) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "Coché",
-                                    tint = Color(0xFF424242),
-                                    modifier = Modifier.size(12.dp)
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Text(
-                            text = transaction.title,
-                            fontWeight = FontWeight.Medium,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        // Titre uniquement (sans catégories)
+                        Column {
+                            Text(
+                                text = transaction.title ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
                     Text(
-                        text = "${if (transaction.amount > 0) "+" else ""}${String.format(Locale.FRANCE, "%.2f", transaction.amount)} €",
-                        fontWeight = FontWeight.Bold,
+                        text = "%.2f €".format(transaction.amount),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (transaction.amount >= 0) positiveColor else negativeColor,
-                        modifier = Modifier.padding(end = 4.dp)
+                        fontWeight = FontWeight.Bold,
+                        color = if (transaction.amount >= 0) positiveColor else negativeColor
                     )
                 }
             }
@@ -823,11 +924,10 @@ fun TransactionItem(
     }
 }
 
-fun getMonthName(year: Int, month: Int): String {
-    val cal = Calendar.getInstance().apply {
-        set(Calendar.YEAR, year)
-        set(Calendar.MONTH, month)
+private fun getMonthName(year: Int, month: Int): String {
+    val calendar = Calendar.getInstance().apply {
+        set(year, month, 1)
     }
-    val formatter = SimpleDateFormat("MMMM yyyy", Locale.FRANCE)
-    return formatter.format(cal.time).replaceFirstChar { it.uppercase() }
+    val sdf = SimpleDateFormat("MMMM yyyy", Locale.FRENCH)
+    return sdf.format(calendar.time).replaceFirstChar { it.uppercase() }
 }

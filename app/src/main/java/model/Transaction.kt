@@ -6,14 +6,14 @@ import com.google.firebase.firestore.PropertyName
 
 data class Transaction(
     @get:Exclude var id: String = "",
-    val title: String = "",
+    val title: String? = "",
     val amount: Double = 0.0,
     val date: Timestamp = Timestamp.now(),
     val type: String = "EXPENSE", // "EXPENSE" ou "INCOME"
 
     // --- NOUVELLES CATÉGORIES ---
-    val familyCategory: String = "Vital / Incompressible", // La grande famille
-    val subCategory: String = "Alimentation",              // La sous-catégorie précise
+    val familyCategory: String? = "Vital / Incompressible", // La grande famille
+    val subCategory: String? = "Alimentation",              // La sous-catégorie précise
 
     val paymentMethod: String = "CB",
 

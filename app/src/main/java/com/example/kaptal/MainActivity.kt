@@ -6,11 +6,14 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -21,19 +24,54 @@ import androidx.navigation.compose.rememberNavController
 import com.example.kaptal.screens.CreditAccountScreen
 import com.example.kaptal.screens.CryptoScreen
 import com.example.kaptal.screens.StandardAccountScreen
+import com.example.kaptal.ui.theme.KaptalTheme
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            MaterialTheme {
+            KaptalTheme {
+                var showSplash by remember { mutableStateOf(true) }
+
+                // Timer pour laisser afficher le Splash Screen personnalisé (ex: 1.2 secondes)
+                LaunchedEffect(Unit) {
+                    delay(1200)
+                    showSplash = false
+                }
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    KaptalApp(activity = this)
+                    if (showSplash) {
+                        // Écran de démarrage personnalisé en plein écran
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // 1. Ton fond personnalisé en plein écran
+                            Image(
+                                painter = painterResource(id = R.drawable.fond_kaptal_propre),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+
+                            // 2. Ton logo par-dessus (ajuste la taille selon tes préférences)
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_k_logo),
+                                contentDescription = "Logo Kaptal",
+                                modifier = Modifier.size(160.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    } else {
+                        // Application principale
+                        KaptalApp(activity = this@MainActivity)
+                    }
                 }
             }
         }
@@ -117,9 +155,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                 account?.let { acc ->
                     StandardAccountScreen(
                         account = acc,
-                        // On récupère la position sauvegardée dans le MainViewModel (120 par défaut)
                         initialPage = viewModel.getSavedPagerPosition(acc.id),
-                        // On met à jour le MainViewModel à chaque fois qu'on change de mois
                         onPageChanged = { page ->
                             viewModel.savePagerPosition(acc.id, page)
                         },

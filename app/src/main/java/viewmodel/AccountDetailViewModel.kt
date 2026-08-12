@@ -12,6 +12,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Calendar
+import java.util.Locale
+
+enum class RecurrenceEditScope {
+    ALL,
+    THIS_AND_FUTURE,
+    THIS_ONLY
+}
 
 class AccountDetailViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
@@ -113,10 +121,155 @@ class AccountDetailViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Gestion avancée de la modification d'une récurrence selon la portée choisie.
+     */
+    fun updateRecurringTransactionWithScope(
+        accountId: String,
+        oldTransaction: Transaction,
+        newTitle: String,
+        newAmount: Double,
+        newFamilyCategory: String,
+        newSubCategory: String,
+        newType: String,
+        newPaymentMethod: String,
+        newDate: Timestamp,
+        newIsRecurring: Boolean,
+        newRecurrenceInterval: String,
+        newEndDate: Timestamp?,
+        effectiveDate: Timestamp,
+        scope: RecurrenceEditScope
+    ) {
+        if (accountId.isEmpty() || oldTransaction.id.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                val transactionsRef = db.collection("accounts")
+                    .document(accountId)
+                    .collection("transactions")
+
+                if (!oldTransaction.isRecurring) {
+                    val updated = oldTransaction.copy(
+                        title = newTitle,
+                        amount = newAmount,
+                        familyCategory = newFamilyCategory,
+                        subCategory = newSubCategory,
+                        type = newType,
+                        paymentMethod = newPaymentMethod,
+                        date = newDate,
+                        isRecurring = newIsRecurring,
+                        recurrenceInterval = newRecurrenceInterval,
+                        endDate = newEndDate
+                    )
+                    transactionsRef.document(oldTransaction.id).set(updated).await()
+                    return@launch
+                }
+
+                val calEff = Calendar.getInstance().apply { time = effectiveDate.toDate() }
+
+                when (scope) {
+                    RecurrenceEditScope.ALL -> {
+                        val updated = oldTransaction.copy(
+                            title = newTitle,
+                            amount = newAmount,
+                            familyCategory = newFamilyCategory,
+                            subCategory = newSubCategory,
+                            type = newType,
+                            paymentMethod = newPaymentMethod,
+                            date = newDate,
+                            isRecurring = newIsRecurring,
+                            recurrenceInterval = newRecurrenceInterval,
+                            endDate = newEndDate
+                        )
+                        transactionsRef.document(oldTransaction.id).set(updated).await()
+                    }
+
+                    RecurrenceEditScope.THIS_AND_FUTURE -> {
+                        transactionsRef.document(oldTransaction.id)
+                            .update("endDate", effectiveDate)
+                            .await()
+
+                        val brandNewTx = Transaction(
+                            title = newTitle,
+                            amount = newAmount,
+                            familyCategory = newFamilyCategory,
+                            subCategory = newSubCategory,
+                            type = newType,
+                            paymentMethod = newPaymentMethod,
+                            date = effectiveDate,
+                            isRecurring = newIsRecurring,
+                            recurrenceInterval = newRecurrenceInterval,
+                            endDate = newEndDate,
+                            checkedMonths = emptyList()
+                        )
+                        transactionsRef.add(brandNewTx).await()
+                    }
+
+                    RecurrenceEditScope.THIS_ONLY -> {
+                        // 1. La série d'origine s'arrête juste avant ce mois
+                        transactionsRef.document(oldTransaction.id)
+                            .update("endDate", effectiveDate)
+                            .await()
+
+                        // 2. Créer l'occurrence isolée modifiée pour ce mois précis (non récurrente)
+                        val isolatedTx = Transaction(
+                            title = newTitle,
+                            amount = newAmount,
+                            familyCategory = newFamilyCategory,
+                            subCategory = newSubCategory,
+                            type = newType,
+                            paymentMethod = newPaymentMethod,
+                            date = effectiveDate,
+                            isRecurring = false,
+                            checkedMonths = emptyList()
+                        )
+                        transactionsRef.add(isolatedTx).await()
+
+                        // 3. Reprendre la série initiale le mois suivant pour préserver le futur
+                        val futureCal = (calEff.clone() as Calendar).apply {
+                            add(Calendar.MONTH, 1)
+                        }
+                        val futureTimestamp = Timestamp(futureCal.time)
+
+                        val remainingSeriesTx = oldTransaction.copy(
+                            id = "",
+                            date = futureTimestamp,
+                            endDate = oldTransaction.endDate,
+                            checkedMonths = emptyList()
+                        )
+                        transactionsRef.add(remainingSeriesTx).await()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("UPDATE_SCOPE_DEBUG", "Erreur lors de la modification avec portée", e)
+            }
+        }
+    }
+
+    /**
+     * Suppression simple (rétrocompatibilité)
+     */
     fun deleteTransaction(
         accountId: String,
         transaction: Transaction,
         effectiveDeleteDate: Timestamp? = null
+    ) {
+        deleteRecurringTransactionWithScope(
+            accountId = accountId,
+            transaction = transaction,
+            effectiveDate = effectiveDeleteDate ?: transaction.date,
+            scope = RecurrenceEditScope.THIS_AND_FUTURE
+        )
+    }
+
+    /**
+     * Gestion avancée de la suppression d'une récurrence selon la portée choisie.
+     */
+    fun deleteRecurringTransactionWithScope(
+        accountId: String,
+        transaction: Transaction,
+        effectiveDate: Timestamp,
+        scope: RecurrenceEditScope
     ) {
         if (accountId.isEmpty() || transaction.id.isEmpty()) return
 
@@ -126,48 +279,47 @@ class AccountDetailViewModel : ViewModel() {
                     .document(accountId)
                     .collection("transactions")
 
-                if (transaction.isRecurring) {
-                    // Si une date effective est passée (date du mois courant), on la prend, sinon on prend transaction.date
-                    val deleteCutoffDate = effectiveDeleteDate ?: transaction.date
-                    val targetTime = deleteCutoffDate.toDate().time
+                if (!transaction.isRecurring) {
+                    transactionsRef.document(transaction.id).delete().await()
+                    return@launch
+                }
 
-                    if (!transaction.recurrenceGroupId.isNullOrEmpty()) {
-                        // CAS 1.A : Groupe de documents générés physiquement
-                        val groupId = transaction.recurrenceGroupId
+                val calEff = Calendar.getInstance().apply { time = effectiveDate.toDate() }
 
-                        val groupSnapshot = transactionsRef
-                            .whereEqualTo("recurrenceGroupId", groupId)
-                            .get()
-                            .await()
+                when (scope) {
+                    RecurrenceEditScope.ALL -> {
+                        transactionsRef.document(transaction.id).delete().await()
+                    }
 
-                        val batch = db.batch()
-
-                        groupSnapshot.documents.forEach { doc ->
-                            val docTimestamp = doc.getTimestamp("date")
-                            if (docTimestamp != null) {
-                                val docTime = docTimestamp.toDate().time
-
-                                if (docTime >= targetTime) {
-                                    // Supprime à partir de la date ciblée (Octobre et +)
-                                    batch.delete(doc.reference)
-                                }
-                            }
-                        }
-
-                        batch.commit().await()
-                    } else {
-                        // CAS 1.B : Document récurrent unique (virtuel)
-                        // On ferme la récurrence à la date sélectionnée (ex: 1er Octobre)
+                    RecurrenceEditScope.THIS_AND_FUTURE -> {
                         transactionsRef.document(transaction.id)
-                            .update("endDate", deleteCutoffDate)
+                            .update("endDate", effectiveDate)
                             .await()
                     }
-                } else {
-                    // CAS 2 : Transaction ponctuelle classique
-                    transactionsRef.document(transaction.id).delete().await()
+
+                    RecurrenceEditScope.THIS_ONLY -> {
+                        // 1. Arrêter la série initiale juste avant ce mois
+                        transactionsRef.document(transaction.id)
+                            .update("endDate", effectiveDate)
+                            .await()
+
+                        // 2. Reprendre la série le mois suivant pour préserver le futur sans ce mois-là
+                        val futureCal = (calEff.clone() as Calendar).apply {
+                            add(Calendar.MONTH, 1)
+                        }
+                        val futureTimestamp = Timestamp(futureCal.time)
+
+                        val remainingSeriesTx = transaction.copy(
+                            id = "",
+                            date = futureTimestamp,
+                            endDate = transaction.endDate,
+                            checkedMonths = emptyList()
+                        )
+                        transactionsRef.add(remainingSeriesTx).await()
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("DELETE_DEBUG", "Erreur lors de la suppression de la transaction", e)
+                Log.e("DELETE_SCOPE_DEBUG", "Erreur lors de la suppression avec portée", e)
             }
         }
     }

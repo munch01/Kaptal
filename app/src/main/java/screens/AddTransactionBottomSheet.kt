@@ -49,7 +49,7 @@ fun AddTransactionBottomSheet(
 
     var subCategory by remember {
         mutableStateOf(
-            if (initialTransaction?.type == "INCOME") initialTransaction.subCategory.ifBlank { incomeCategories.first() }
+            if (initialTransaction?.type == "INCOME") initialTransaction.subCategory?.takeIf { it.isNotBlank() } ?: incomeCategories.first()
             else initialTransaction?.subCategory?.takeIf { it.isNotBlank() } ?: transactionCategories.first().subCategories.first()
         )
     }
@@ -77,7 +77,6 @@ fun AddTransactionBottomSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        // Utilisation d'une LazyColumn pour permettre le défilement et garder le bouton accessible
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -142,7 +141,6 @@ fun AddTransactionBottomSheet(
                 )
             }
 
-            // --- SÉLECTION DES CATÉGORIES (DIFFÉRENTE SI DÉPENSE OU RECETTE) ---
             if (type == "EXPENSE") {
                 item {
                     ExposedDropdownMenuBox(
@@ -327,7 +325,9 @@ fun AddTransactionBottomSheet(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = if (endDate != null) "Date de fin : ${dateFormat.format(endDate!!)}" else "Pas de date de fin (Infini)")
+                        val safeEndDate = endDate
+                        val dateString = if (safeEndDate != null) dateFormat.format(safeEndDate) else ""
+                        Text(text = if (safeEndDate != null) "Date de fin : $dateString" else "Pas de date de fin (Infini)")
                     }
                 }
 
@@ -351,6 +351,7 @@ fun AddTransactionBottomSheet(
                         val finalFamily = if (type == "INCOME") "Recettes" else familyCategory
 
                         if (title.isNotBlank() && rawAmount != 0.0) {
+                            val safeEndDate = endDate
                             onSave(
                                 title,
                                 finalAmount,
@@ -361,7 +362,7 @@ fun AddTransactionBottomSheet(
                                 Timestamp(selectedDate),
                                 isRecurring,
                                 if (isRecurring) "MONTHLY" else null,
-                                if (isRecurring && endDate != null) Timestamp(endDate!!) else null
+                                if (isRecurring && safeEndDate != null) Timestamp(safeEndDate) else null
                             )
                             onDismiss()
                         }

@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <!-- Thème principal -->
-    <style name="Theme.Kaptal" parent="android:Theme.Material.Light.NoActionBar" />
-
-    <!-- Thème du Splash Screen -->
-    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FFFFFF</item>
-        <!-- Icône temporaire du système pour tester -->
-        <item name="windowSplashScreenAnimatedIcon">@android:drawable/ic_dialog_info</item>
-        <item name="postSplashScreenTheme">@style/Theme.Kaptal</item>
+    <!-- Thème principal avec transparence pour éviter le flash blanc/gris -->
+    <style name="Theme.Kaptal" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Rend la fenêtre transparente au tout premier démarrage pour laisser place nette à Compose -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
     </style>
-
 </resources>
