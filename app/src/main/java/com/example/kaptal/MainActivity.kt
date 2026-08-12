@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -29,8 +30,20 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 class MainActivity : FragmentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
+        val lang = prefs.getString("selected_language", "Français") ?: "Français"
+        super.attachBaseContext(LocaleHelper.setLocale(newBase, lang))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Forcer la langue au niveau de la configuration locale de l'activité
+        val prefs = getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
+        val lang = prefs.getString("selected_language", "Français") ?: "Français"
+        LocaleHelper.setLocale(this, lang)
 
         setContent {
             KaptalTheme {
@@ -79,10 +92,17 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()) {
+fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel(), settingsViewModel: SettingsViewModel = viewModel()) {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
     val context = activity.applicationContext
+
+    // Surveillance du changement de langue pour recréer l'activité
+    LaunchedEffect(Unit) {
+        settingsViewModel.languageChangedEvent.collect {
+            activity.recreate()
+        }
+    }
 
     val prefs = remember { context.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE) }
     val isBiometricEnabled = remember { prefs.getBoolean("biometric_enabled", false) }
@@ -96,7 +116,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                 activity = activity,
                 onSuccess = { isUnlocked = true },
                 onError = {
-                    Toast.makeText(context, "Empreinte requise pour ouvrir l'application", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.biometric_error_required), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -125,13 +145,11 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                     onNavigateToSettings = {
                         navController.navigate("settings")
                     },
-                    onNavigateToCrypto = {
-                        navController.navigate("crypto")
-                    },
                     onAccountClick = { account ->
                         viewModel.selectAccount(account)
                         when (account.type) {
                             "CREDIT" -> navController.navigate("credit_detail")
+                            "LIVRET_A" -> navController.navigate("livret_a_detail")
                             else -> navController.navigate("standard_detail")
                         }
                     }
@@ -139,7 +157,11 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
             }
 
             composable("crypto") {
-                CryptoScreen()
+                CryptoScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
             }
 
             composable("settings") {
@@ -152,9 +174,13 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
 
             composable("standard_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
+                val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                
                 account?.let { acc ->
                     StandardAccountScreen(
                         account = acc,
+                        allAccounts = allAccounts,
                         initialPage = viewModel.getSavedPagerPosition(acc.id),
                         onPageChanged = { page ->
                             viewModel.savePagerPosition(acc.id, page)
@@ -166,9 +192,31 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
 
             composable("credit_detail") {
                 val account by viewModel.selectedAccount.collectAsState()
+                val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+
                 account?.let {
                     CreditAccountScreen(
                         account = it,
+                        allAccounts = allAccounts,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            composable("livret_a_detail") {
+                val account by viewModel.selectedAccount.collectAsState()
+                val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+
+                account?.let { acc ->
+                    StandardAccountScreen(
+                        account = acc,
+                        allAccounts = allAccounts,
+                        initialPage = viewModel.getSavedPagerPosition(acc.id),
+                        onPageChanged = { page ->
+                            viewModel.savePagerPosition(acc.id, page)
+                        },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
@@ -191,7 +239,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                         verticalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Kaptal est verrouillé",
+                            text = stringResource(R.string.lock_title),
                             style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -208,7 +256,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Déverrouiller avec l'empreinte")
+                            Text(stringResource(R.string.lock_unlock_button))
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -220,7 +268,7 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Utiliser le mot de passe")
+                            Text(stringResource(R.string.lock_use_password_button))
                         }
                     }
                 }
@@ -255,9 +303,9 @@ private fun triggerAppUnlockBiometric(
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Déverrouillage Kaptal")
-            .setSubtitle("Scannez votre empreinte pour accéder à l'application")
-            .setNegativeButtonText("Annuler")
+            .setTitle(activity.getString(R.string.biometric_prompt_title))
+            .setSubtitle(activity.getString(R.string.biometric_prompt_subtitle))
+            .setNegativeButtonText(activity.getString(R.string.cancel_label))
             .build()
 
         biometricPrompt.authenticate(promptInfo)

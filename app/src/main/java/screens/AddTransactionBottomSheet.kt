@@ -9,9 +9,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.kaptal.R
+import com.example.kaptal.model.Account
 import com.example.kaptal.model.Transaction
 import com.example.kaptal.model.transactionCategories
 import com.google.firebase.Timestamp
@@ -23,8 +26,10 @@ import kotlin.math.abs
 @Composable
 fun AddTransactionBottomSheet(
     initialTransaction: Transaction? = null,
+    accounts: List<Account> = emptyList(),
+    currentAccountId: String = "",
     onDismiss: () -> Unit,
-    onSave: (title: String, amount: Double, familyCategory: String, subCategory: String, type: String, paymentMethod: String, date: Timestamp, isRecurring: Boolean, recurrenceInterval: String?, endDate: Timestamp?) -> Unit
+    onSave: (title: String, amount: Double, familyCategory: String, subCategory: String, type: String, paymentMethod: String, date: Timestamp, isRecurring: Boolean, recurrenceInterval: String?, endDate: Timestamp?, targetAccountId: String?) -> Unit
 ) {
     var title by remember { mutableStateOf(initialTransaction?.title ?: "") }
 
@@ -57,9 +62,18 @@ fun AddTransactionBottomSheet(
     var expandedFamily by remember { mutableStateOf(false) }
     var expandedSubCategory by remember { mutableStateOf(false) }
 
-    val paymentMethods = listOf("CB", "Espèces", "Virement", "Chèque")
+    val paymentMethods = listOf(
+        stringResource(R.string.payment_method_cb),
+        stringResource(R.string.payment_method_cash),
+        stringResource(R.string.payment_method_transfer),
+        stringResource(R.string.payment_method_check)
+    )
     var paymentMethod by remember { mutableStateOf(initialTransaction?.paymentMethod ?: "CB") }
     var expandedPayment by remember { mutableStateOf(false) }
+
+    // --- GESTION DU VIREMENT ---
+    var targetAccountId by remember { mutableStateOf<String?>(null) }
+    var expandedTargetAccount by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRENCH)
@@ -87,7 +101,7 @@ fun AddTransactionBottomSheet(
         ) {
             item {
                 Text(
-                    text = if (initialTransaction == null) "Nouvelle opération" else "Modifier l'opération",
+                    text = if (initialTransaction == null) stringResource(R.string.tx_new_title) else stringResource(R.string.tx_edit_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -102,20 +116,31 @@ fun AddTransactionBottomSheet(
                             familyCategory = transactionCategories.first().name
                             subCategory = transactionCategories.first().subCategories.first()
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
                     ) {
-                        Text("Dépense")
+                        Text(stringResource(R.string.tx_type_expense))
                     }
                     SegmentedButton(
                         selected = type == "INCOME",
                         onClick = {
                             type = "INCOME"
-                            familyCategory = "Recettes"
+                            familyCategory = context.getString(R.string.tx_income_family)
                             subCategory = incomeCategories.first()
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
                     ) {
-                        Text("Recette")
+                        Text(stringResource(R.string.tx_type_income))
+                    }
+                    SegmentedButton(
+                        selected = type == "TRANSFER",
+                        onClick = {
+                            type = "TRANSFER"
+                            familyCategory = "Virement"
+                            subCategory = "Virement interne"
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                    ) {
+                        Text(stringResource(R.string.tx_type_transfer))
                     }
                 }
             }
@@ -124,7 +149,7 @@ fun AddTransactionBottomSheet(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Libellé (ex: Courses, Salaire...)") },
+                    label = { Text(stringResource(R.string.tx_label_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -134,11 +159,45 @@ fun AddTransactionBottomSheet(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text("Montant (€)") },
+                    label = { Text(stringResource(R.string.tx_amount_hint)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+            }
+
+            if (type == "TRANSFER") {
+                item {
+                    ExposedDropdownMenuBox(
+                        expanded = expandedTargetAccount,
+                        onExpandedChange = { expandedTargetAccount = !expandedTargetAccount }
+                    ) {
+                        val targetAccount = accounts.find { it.id == targetAccountId }
+                        OutlinedTextField(
+                            value = targetAccount?.name ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(stringResource(R.string.tx_target_account_label)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedTargetAccount,
+                            onDismissRequest = { expandedTargetAccount = false }
+                        ) {
+                            accounts.filter { it.id != currentAccountId }.forEach { account ->
+                                DropdownMenuItem(
+                                    text = { Text(account.name) },
+                                    onClick = {
+                                        targetAccountId = account.id
+                                        expandedTargetAccount = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             if (type == "EXPENSE") {
@@ -151,7 +210,7 @@ fun AddTransactionBottomSheet(
                             value = familyCategory,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Grande famille de dépense") },
+                            label = { Text(stringResource(R.string.tx_family_label)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -186,7 +245,7 @@ fun AddTransactionBottomSheet(
                             value = subCategory,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Sous-catégorie") },
+                            label = { Text(stringResource(R.string.tx_subcategory_label)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -217,7 +276,7 @@ fun AddTransactionBottomSheet(
                             value = subCategory,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Catégorie de recette") },
+                            label = { Text(stringResource(R.string.tx_income_category_label)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -249,7 +308,7 @@ fun AddTransactionBottomSheet(
                         value = paymentMethod,
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Source des fonds / Paiement") },
+                        label = { Text(stringResource(R.string.tx_payment_method_label)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
@@ -288,7 +347,7 @@ fun AddTransactionBottomSheet(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "Date : ${dateFormat.format(selectedDate)}")
+                    Text(text = stringResource(R.string.tx_date_prefix, dateFormat.format(selectedDate)))
                 }
             }
 
@@ -298,7 +357,7 @@ fun AddTransactionBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(text = "Opération récurrente (mensuelle)")
+                    Text(text = stringResource(R.string.tx_recurring_label))
                     Switch(
                         checked = isRecurring,
                         onCheckedChange = { isRecurring = it }
@@ -327,7 +386,7 @@ fun AddTransactionBottomSheet(
                     ) {
                         val safeEndDate = endDate
                         val dateString = if (safeEndDate != null) dateFormat.format(safeEndDate) else ""
-                        Text(text = if (safeEndDate != null) "Date de fin : $dateString" else "Pas de date de fin (Infini)")
+                        Text(text = if (safeEndDate != null) stringResource(R.string.tx_end_date_prefix, dateString) else stringResource(R.string.tx_end_date_none))
                     }
                 }
 
@@ -337,7 +396,7 @@ fun AddTransactionBottomSheet(
                             onClick = { endDate = null },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Effacer la date de fin (Infini)")
+                            Text(stringResource(R.string.tx_clear_end_date))
                         }
                     }
                 }
@@ -348,7 +407,11 @@ fun AddTransactionBottomSheet(
                     onClick = {
                         val rawAmount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
                         val finalAmount = if (type == "EXPENSE") -abs(rawAmount) else abs(rawAmount)
-                        val finalFamily = if (type == "INCOME") "Recettes" else familyCategory
+                        val finalFamily = when(type) {
+                            "INCOME" -> context.getString(R.string.tx_income_family)
+                            "TRANSFER" -> "Virement"
+                            else -> familyCategory
+                        }
 
                         if (title.isNotBlank() && rawAmount != 0.0) {
                             val safeEndDate = endDate
@@ -362,14 +425,15 @@ fun AddTransactionBottomSheet(
                                 Timestamp(selectedDate),
                                 isRecurring,
                                 if (isRecurring) "MONTHLY" else null,
-                                if (isRecurring && safeEndDate != null) Timestamp(safeEndDate) else null
+                                if (isRecurring && safeEndDate != null) Timestamp(safeEndDate) else null,
+                                targetAccountId
                             )
                             onDismiss()
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (initialTransaction == null) "Enregistrer" else "Modifier")
+                    Text(if (initialTransaction == null) stringResource(R.string.tx_save_button) else stringResource(R.string.tx_edit_button))
                 }
             }
         }

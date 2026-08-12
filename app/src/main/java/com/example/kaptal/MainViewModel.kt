@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 // --- ÉTATS DE L'UI ---
@@ -68,10 +69,49 @@ class MainViewModel : ViewModel() {
     private val _cryptoRates = MutableStateFlow<Map<String, Double>>(emptyMap())
     val cryptoRates: StateFlow<Map<String, Double>> = _cryptoRates.asStateFlow()
 
+    // --- StateFlow pour le taux du Livret A ---
+    private val _livretARate = MutableStateFlow(3.0) // Défaut à 3%
+    val livretARate: StateFlow<Double> = _livretARate.asStateFlow()
+
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        if (firebaseAuth.currentUser != null) {
+            loadAccounts()
+            loadUserSettings()
+        } else {
+            accountsListener?.remove()
+            _uiState.value = AccountsUiState.Error("Utilisateur non connecté.")
+        }
+    }
+
     init {
-        loadAccounts()
-        loadUserSettings()
+        auth.addAuthStateListener(authStateListener)
         fetchCryptoRates()
+        fetchLivretARate()
+    }
+
+    // --- RÉCUPÉRATION DU TAUX LIVRET A (Open Data) ---
+    fun fetchLivretARate() {
+        viewModelScope.launch {
+            try {
+                val rate = withContext(Dispatchers.IO) {
+                    val url = URL("https://www.data.gouv.fr/fr/datasets/r/f01b058a-36b1-4b71-b0e6-9b7e7c7e39a3")
+                    val csvText = url.readText()
+                    val lines = csvText.split("\n")
+                    if (lines.size > 1) {
+                        // On prend la dernière ligne non vide (souvent la plus récente)
+                        // ou la deuxième si c'est trié par date DESC
+                        val dataLine = lines.filter { it.isNotBlank() }.last()
+                        val columns = dataLine.split(";")
+                        // Structure supposée : date;taux_la;taux_ldds;taux_lep
+                        columns[1].replace(",", ".").toDoubleOrNull() ?: 3.0
+                    } else 3.0
+                }
+                _livretARate.value = rate
+            } catch (e: Exception) {
+                // Fallback à 3% en cas d'erreur réseau
+                _livretARate.value = 3.0
+            }
+        }
     }
 
     // --- RÉCUPÉRATION DES COURS CRYPTO EN DIRECT (COINGECKO) ---
@@ -101,6 +141,97 @@ class MainViewModel : ViewModel() {
 
     fun selectAccount(account: Account?) {
         _selectedAccount.value = account
+    }
+
+    /**
+     * Calcule les intérêts du Livret A pour l'année en cours
+     * Règle des quinzaines : 24 quinzaines par an.
+     */
+    fun calculateLivretAInterests(account: Account, transactions: List<Transaction>, rate: Double): Double {
+        val now = Calendar.getInstance()
+        val currentYear = now.get(Calendar.YEAR)
+        
+        var totalInterests = 0.0
+        val ratePerFortnight = (rate / 100.0) / 24.0
+
+        // On itère sur les 24 quinzaines de l'année
+        for (q in 0 until 24) {
+            val month = q / 2
+            val isSecondHalf = q % 2 == 1
+            
+            // Calcul du solde à la fin de la quinzaine précédente
+            // (Pour la quinzaine n, on regarde l'impact des mouvements passés)
+            val balance = calculateBalanceAtFortnight(account, transactions, currentYear, month, isSecondHalf)
+            
+            if (balance > 0) {
+                totalInterests += balance * ratePerFortnight
+            }
+        }
+        
+        return totalInterests
+    }
+
+    private fun calculateBalanceAtFortnight(
+        account: Account,
+        transactions: List<Transaction>,
+        year: Int,
+        month: Int,
+        isSecondHalf: Boolean
+    ): Double {
+        var balance = account.initialBalance
+        
+        val pivotCal = Calendar.getInstance().apply {
+            set(year, month, if (isSecondHalf) 16 else 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val pivotDate = pivotCal.time
+
+        for (tx in transactions) {
+            if (tx.isRecurring) {
+                val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+                var iterCal = txCal.clone() as Calendar
+                while (iterCal.time.before(pivotDate)) {
+                    val mKey = String.format(Locale.US, "%d-%02d", iterCal.get(Calendar.YEAR), iterCal.get(Calendar.MONTH) + 1)
+                    if (tx.isCheckedForMonth(mKey)) {
+                        val valDate = getValueDate(iterCal, tx.amount)
+                        if (!valDate.after(pivotDate)) {
+                            balance += tx.amount
+                        }
+                    }
+                    iterCal.add(Calendar.MONTH, 1)
+                    if (tx.endDate != null && iterCal.time.after(tx.endDate.toDate())) break
+                }
+            } else {
+                val valDate = getValueDate(Calendar.getInstance().apply { time = tx.date.toDate() }, tx.amount)
+                if (!valDate.after(pivotDate)) {
+                    balance += tx.amount
+                }
+            }
+        }
+        return balance
+    }
+
+    private fun getValueDate(txCal: Calendar, amount: Double): Date {
+        val valCal = txCal.clone() as Calendar
+        if (amount > 0) { // Dépôt : Date de valeur = début quinzaine suivante
+            if (valCal.get(Calendar.DAY_OF_MONTH) <= 15) {
+                valCal.set(Calendar.DAY_OF_MONTH, 16)
+            } else {
+                valCal.add(Calendar.MONTH, 1)
+                valCal.set(Calendar.DAY_OF_MONTH, 1)
+            }
+        } else { // Retrait : Date de valeur = fin quinzaine précédente
+            if (valCal.get(Calendar.DAY_OF_MONTH) <= 15) {
+                valCal.set(Calendar.DAY_OF_MONTH, 1)
+            } else {
+                valCal.set(Calendar.DAY_OF_MONTH, 16)
+            }
+        }
+        valCal.set(Calendar.HOUR_OF_DAY, 0)
+        valCal.set(Calendar.MINUTE, 0)
+        valCal.set(Calendar.SECOND, 0)
+        valCal.set(Calendar.MILLISECOND, 0)
+        return valCal.time
     }
 
     // --- CHARGEMENT DES COMPTES ---
@@ -260,6 +391,7 @@ class MainViewModel : ViewModel() {
         type: String,
         isJoint: Boolean,
         color: String,
+        linkedAccountId: String? = null,
         onAccountCreated: (String) -> Unit
     ) {
         val currentUser = auth.currentUser ?: return
@@ -280,7 +412,8 @@ class MainViewModel : ViewModel() {
                     color = color,
                     order = nextOrder,
                     members = membersList,
-                    ownerId = currentUser.uid
+                    ownerId = currentUser.uid,
+                    linkedAccountId = linkedAccountId
                 )
 
                 newAccountRef.set(account).await()
@@ -297,17 +430,19 @@ class MainViewModel : ViewModel() {
         type: String,
         isJoint: Boolean,
         color: String,
+        linkedAccountId: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             try {
-                val updates = mapOf(
+                val updates = mutableMapOf<String, Any?>(
                     "name" to name,
                     "bankName" to bankName,
                     "initialBalance" to initialBalance,
                     "type" to type,
                     "isJoint" to isJoint,
-                    "color" to color
+                    "color" to color,
+                    "linkedAccountId" to linkedAccountId
                 )
                 firestore.collection("accounts").document(accountId).update(updates).await()
                 onSuccess()
@@ -364,6 +499,7 @@ class MainViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
+        auth.removeAuthStateListener(authStateListener)
         accountsListener?.remove()
         transactionsListeners.values.forEach { it.remove() }
     }

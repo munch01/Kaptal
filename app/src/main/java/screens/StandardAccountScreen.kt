@@ -26,12 +26,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kaptal.R
+import com.example.kaptal.MainViewModel
 import com.example.kaptal.model.Account
 import com.example.kaptal.model.Transaction
 import com.example.kaptal.viewmodel.AccountDetailViewModel
@@ -44,12 +46,15 @@ import java.util.*
 @Composable
 fun StandardAccountScreen(
     account: Account,
+    allAccounts: List<Account> = emptyList(),
     initialPage: Int = 120,
     onPageChanged: (Int) -> Unit = {},
     onBackClick: () -> Unit,
-    viewModel: AccountDetailViewModel = viewModel()
+    mainViewModel: MainViewModel = viewModel(),
+    detailViewModel: AccountDetailViewModel = viewModel()
 ) {
-    val transactions by viewModel.transactions.collectAsState()
+    val transactions by detailViewModel.transactions.collectAsState()
+    val livretARate by mainViewModel.livretARate.collectAsState()
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showChartSheet by remember { mutableStateOf(false) }
@@ -58,7 +63,7 @@ fun StandardAccountScreen(
     var showEditChoiceDialog by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
 
     LaunchedEffect(account.id) {
-        viewModel.loadTransactions(account.id)
+        detailViewModel.loadTransactions(account.id)
     }
 
     val pagerState = rememberPagerState(
@@ -87,7 +92,7 @@ fun StandardAccountScreen(
             alpha = 0.3f
         )
 
-        // 2. Logo central en filigrane (replacé ici pour ne plus être masqué)
+        // 2. Logo central en filigrane
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -95,11 +100,11 @@ fun StandardAccountScreen(
             contentAlignment = Alignment.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.ic_kaptal_logo),
+                painter = painterResource(id = R.drawable.ic_k_logo),
                 contentDescription = "Logo K Kaptal",
                 modifier = Modifier.fillMaxWidth(0.9f),
                 contentScale = ContentScale.Fit,
-                alpha = 0.75f
+                alpha = 0.15f
             )
         }
 
@@ -118,21 +123,21 @@ fun StandardAccountScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_label))
                         }
                     },
                     actions = {
                         IconButton(onClick = { showChartSheet = true }) {
                             Icon(
                                 imageVector = Icons.Default.Info,
-                                contentDescription = "Répartition par catégorie",
+                                contentDescription = stringResource(R.string.account_detail_chart),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         IconButton(onClick = { showAddSheet = true }) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Ajouter une opération",
+                                contentDescription = stringResource(R.string.account_detail_add_operation),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -160,35 +165,57 @@ fun StandardAccountScreen(
                     val year = totalMonths / 12
                     val month = totalMonths % 12
 
-                    MonthPageContent(
-                        initialBalance = account.initialBalance,
-                        year = year,
-                        month = month,
-                        transactions = transactions,
-                        onCheckedChange = { transactionId, monthKey, isChecked ->
-                            viewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
-                        },
-                        onEditClick = { transaction ->
-                            val targetCal = Calendar.getInstance().apply {
-                                set(year, month, 1, 0, 0, 0)
-                                set(Calendar.MILLISECOND, 0)
+                    Column {
+                        if (account.type == "LIVRET_A") {
+                            val estimatedInterests = remember(transactions, livretARate) {
+                                mainViewModel.calculateLivretAInterests(account, transactions, livretARate)
                             }
-                            val effectiveTimestamp = Timestamp(targetCal.time)
-                            if (transaction.isRecurring) {
-                                showEditChoiceDialog = Pair(transaction, effectiveTimestamp)
-                            } else {
-                                transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4).copy(alpha = 0.9f)),
+                                border = BorderStroke(1.dp, Color(0xFFFBC02D))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(stringResource(R.string.livret_a_interests_title), fontWeight = FontWeight.Bold, color = Color(0xFFF57F17))
+                                        Text(stringResource(R.string.livret_a_rate_label, livretARate.toString()), style = MaterialTheme.typography.bodySmall, color = Color(0xFFF57F17))
+                                    }
+                                    Text("+ %.2f €".format(estimatedInterests), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
+                                    Text(stringResource(R.string.livret_a_rule_notice), style = MaterialTheme.typography.labelSmall)
+                                }
                             }
-                        },
-                        onDeleteClick = { transaction ->
-                            val targetCal = Calendar.getInstance().apply {
-                                set(year, month, 1, 0, 0, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
-                            val effectiveTimestamp = Timestamp(targetCal.time)
-                            transactionToDelete = Pair(transaction, effectiveTimestamp)
                         }
-                    )
+
+                        MonthPageContent(
+                            initialBalance = account.initialBalance,
+                            year = year,
+                            month = month,
+                            transactions = transactions,
+                            onCheckedChange = { transactionId, monthKey, isChecked ->
+                                detailViewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
+                            },
+                            onEditClick = { transaction ->
+                                val targetCal = Calendar.getInstance().apply {
+                                    set(year, month, 1, 0, 0, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val effectiveTimestamp = Timestamp(targetCal.time)
+                                if (transaction.isRecurring) {
+                                    showEditChoiceDialog = Pair(transaction, effectiveTimestamp)
+                                } else {
+                                    transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
+                                }
+                            },
+                            onDeleteClick = { transaction ->
+                                val targetCal = Calendar.getInstance().apply {
+                                    set(year, month, 1, 0, 0, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val effectiveTimestamp = Timestamp(targetCal.time)
+                                transactionToDelete = Pair(transaction, effectiveTimestamp)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -211,8 +238,8 @@ fun StandardAccountScreen(
     showEditChoiceDialog?.let { (transaction, effectiveDate) ->
         AlertDialog(
             onDismissRequest = { showEditChoiceDialog = null },
-            title = { Text("Modifier l'opération récurrente") },
-            text = { Text("Comment souhaitez-vous appliquer cette modification sur la récurrence ?") },
+            title = { Text(stringResource(R.string.recurrence_edit_title)) },
+            text = { Text(stringResource(R.string.recurrence_edit_text)) },
             confirmButton = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -225,7 +252,7 @@ fun StandardAccountScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Toute la série")
+                        Text(stringResource(R.string.recurrence_all))
                     }
                     TextButton(
                         onClick = {
@@ -234,7 +261,7 @@ fun StandardAccountScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Ce mois et les futurs")
+                        Text(stringResource(R.string.recurrence_future))
                     }
                     TextButton(
                         onClick = {
@@ -243,7 +270,7 @@ fun StandardAccountScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Cette occurrence uniquement")
+                        Text(stringResource(R.string.recurrence_this_only))
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -252,7 +279,7 @@ fun StandardAccountScreen(
                         onClick = { showEditChoiceDialog = null },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Annuler", color = MaterialTheme.colorScheme.outline)
+                        Text(stringResource(R.string.cancel_label), color = MaterialTheme.colorScheme.outline)
                     }
                 }
             }
@@ -265,14 +292,14 @@ fun StandardAccountScreen(
         AlertDialog(
             onDismissRequest = { transactionToDelete = null },
             title = {
-                Text(text = if (isRecurringSeries) "Supprimer la récurrence" else "Supprimer l'opération")
+                Text(text = if (isRecurringSeries) stringResource(R.string.recurrence_delete_title) else stringResource(R.string.transaction_delete_title))
             },
             text = {
                 Text(
                     text = if (isRecurringSeries) {
-                        "Cette opération est récurrente. Voulez-vous supprimer toute la série, seulement à partir de ce mois, ou juste ce mois-ci ?"
+                        stringResource(R.string.recurrence_delete_text)
                     } else {
-                        "Voulez-vous vraiment supprimer l'opération \"${transaction.title}\" ?"
+                        stringResource(R.string.transaction_delete_text, transaction.title ?: "")
                     }
                 )
             },
@@ -281,7 +308,7 @@ fun StandardAccountScreen(
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(
                             onClick = {
-                                viewModel.deleteRecurringTransactionWithScope(
+                                detailViewModel.deleteRecurringTransactionWithScope(
                                     accountId = account.id,
                                     transaction = transaction,
                                     effectiveDate = effectiveDate,
@@ -291,11 +318,11 @@ fun StandardAccountScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Toute la série", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.recurrence_all), color = MaterialTheme.colorScheme.error)
                         }
                         TextButton(
                             onClick = {
-                                viewModel.deleteRecurringTransactionWithScope(
+                                detailViewModel.deleteRecurringTransactionWithScope(
                                     accountId = account.id,
                                     transaction = transaction,
                                     effectiveDate = effectiveDate,
@@ -305,11 +332,11 @@ fun StandardAccountScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("À partir de ce mois-ci", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.recurrence_future), color = MaterialTheme.colorScheme.error)
                         }
                         TextButton(
                             onClick = {
-                                viewModel.deleteRecurringTransactionWithScope(
+                                detailViewModel.deleteRecurringTransactionWithScope(
                                     accountId = account.id,
                                     transaction = transaction,
                                     effectiveDate = effectiveDate,
@@ -319,7 +346,7 @@ fun StandardAccountScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Ce mois uniquement", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.recurrence_this_only), color = MaterialTheme.colorScheme.error)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -328,7 +355,7 @@ fun StandardAccountScreen(
                             onClick = { transactionToDelete = null },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Annuler", color = MaterialTheme.colorScheme.outline)
+                            Text(stringResource(R.string.cancel_label), color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 } else {
@@ -338,11 +365,11 @@ fun StandardAccountScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextButton(onClick = { transactionToDelete = null }) {
-                            Text("Annuler")
+                            Text(stringResource(R.string.cancel_label))
                         }
                         TextButton(
                             onClick = {
-                                viewModel.deleteTransaction(
+                                detailViewModel.deleteTransaction(
                                     accountId = account.id,
                                     transaction = transaction,
                                     effectiveDeleteDate = effectiveDate
@@ -350,7 +377,7 @@ fun StandardAccountScreen(
                                 transactionToDelete = null
                             }
                         ) {
-                            Text("Supprimer", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.delete_label), color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -360,22 +387,37 @@ fun StandardAccountScreen(
 
     if (showAddSheet) {
         AddTransactionBottomSheet(
+            accounts = allAccounts,
+            currentAccountId = account.id,
             onDismiss = { showAddSheet = false },
-            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
-                val newTransaction = Transaction(
-                    title = title,
-                    amount = amount,
-                    familyCategory = familyCategory,
-                    subCategory = subCategory,
-                    type = type,
-                    paymentMethod = paymentMethod,
-                    date = date,
-                    checkedMonths = emptyList(),
-                    isRecurring = isRecurring,
-                    recurrenceInterval = recurrenceInterval ?: "Mensuel",
-                    endDate = endDate
-                )
-                viewModel.addTransaction(account.id, newTransaction)
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, targetAccountId ->
+                if (type == "TRANSFER" && targetAccountId != null) {
+                    detailViewModel.performTransfer(
+                        sourceAccountId = account.id,
+                        targetAccountId = targetAccountId,
+                        amount = amount,
+                        title = title,
+                        date = date,
+                        isRecurring = isRecurring,
+                        recurrenceInterval = recurrenceInterval,
+                        endDate = endDate
+                    )
+                } else {
+                    val newTransaction = Transaction(
+                        title = title,
+                        amount = amount,
+                        familyCategory = familyCategory,
+                        subCategory = subCategory,
+                        type = type,
+                        paymentMethod = paymentMethod,
+                        date = date,
+                        checkedMonths = emptyList(),
+                        isRecurring = isRecurring,
+                        recurrenceInterval = recurrenceInterval ?: "Mensuel",
+                        endDate = endDate
+                    )
+                    detailViewModel.addTransaction(account.id, newTransaction)
+                }
             }
         )
     }
@@ -384,10 +426,12 @@ fun StandardAccountScreen(
         val (effectiveDate, scope) = editInfo
         AddTransactionBottomSheet(
             initialTransaction = transaction,
+            accounts = allAccounts,
+            currentAccountId = account.id,
             onDismiss = { transactionToEdit = null },
-            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate ->
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, _ ->
                 if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
-                    viewModel.updateRecurringTransactionWithScope(
+                    detailViewModel.updateRecurringTransactionWithScope(
                         accountId = account.id,
                         oldTransaction = transaction,
                         newTitle = title,
@@ -416,7 +460,7 @@ fun StandardAccountScreen(
                         recurrenceInterval = recurrenceInterval ?: transaction.recurrenceInterval,
                         endDate = endDate
                     )
-                    viewModel.updateTransaction(account.id, updatedTransaction)
+                    detailViewModel.updateTransaction(account.id, updatedTransaction)
                 }
                 transactionToEdit = null
             }
@@ -459,7 +503,7 @@ fun CategoryDistributionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Répartition par catégorie", fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.category_distribution), fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -468,7 +512,7 @@ fun CategoryDistributionDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Dépenses pour ${getMonthName(year, month)}",
+                    text = stringResource(R.string.category_expenses_for, getMonthName(year, month)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -483,7 +527,7 @@ fun CategoryDistributionDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Aucune dépense ce mois-ci",
+                            text = stringResource(R.string.category_no_expenses),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -497,9 +541,16 @@ fun CategoryDistributionDialog(
                             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = family, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = family,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "${String.format(Locale.FRANCE, "%.2f", familyAmount)} € (${String.format(Locale.FRANCE, "%.1f", familyPercentage)}%)",
                                         style = MaterialTheme.typography.titleSmall,
@@ -511,7 +562,8 @@ fun CategoryDistributionDialog(
                                     progress = { (familyPercentage / 100).toFloat() },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(10.dp),
+                                        .height(8.dp)
+                                        .clip(CircleShape),
                                     color = MaterialTheme.colorScheme.primary,
                                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                                 )
@@ -522,31 +574,35 @@ fun CategoryDistributionDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(start = 12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     subCategories.forEach { (subCategory, subAmount, subPercentageOfFamily) ->
                                         Column(modifier = Modifier.fillMaxWidth()) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
                                                     text = "• $subCategory",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.weight(1f)
                                                 )
+                                                Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
-                                                    text = "${String.format(Locale.FRANCE, "%.2f", subAmount)} € (${String.format(Locale.FRANCE, "%.1f", subPercentageOfFamily)}% de la famille)",
+                                                    text = "${String.format(Locale.FRANCE, "%.2f", subAmount)} € (${String.format(Locale.FRANCE, "%.1f", subPercentageOfFamily)}%)",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Spacer(modifier = Modifier.height(4.dp))
                                             LinearProgressIndicator(
                                                 progress = { (subPercentageOfFamily / 100).toFloat() },
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(4.dp),
+                                                    .height(4.dp)
+                                                    .clip(CircleShape),
                                                 color = MaterialTheme.colorScheme.secondary,
                                                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
                                             )
@@ -560,7 +616,7 @@ fun CategoryDistributionDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Fermer") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.category_close)) }
         }
     )
 }
@@ -631,7 +687,7 @@ fun MonthPageContent(
                 border = BorderStroke(1.dp, if (realBalance >= 0) Color(0xFFD1E7DD) else Color(0xFFF8D7DA))
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = "Solde Réel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = stringResource(R.string.account_detail_real_balance), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "%.2f €".format(realBalance),
@@ -650,7 +706,7 @@ fun MonthPageContent(
                 border = BorderStroke(1.dp, if (projectedBalance >= 0) Color(0xFFD1E7DD) else Color(0xFFF8D7DA))
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = "Solde Projeté", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = stringResource(R.string.account_detail_projected_balance), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "%.2f €".format(projectedBalance),
@@ -665,7 +721,7 @@ fun MonthPageContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Opérations",
+            text = stringResource(R.string.account_detail_operations),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
@@ -679,7 +735,7 @@ fun MonthPageContent(
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "Aucune opération pour ce mois", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = stringResource(R.string.account_detail_no_operations), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             LazyColumn(

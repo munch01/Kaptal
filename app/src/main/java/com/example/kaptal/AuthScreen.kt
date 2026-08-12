@@ -2,6 +2,7 @@ package com.example.kaptal
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -14,7 +15,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -24,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.example.kaptal.R
 
 @Composable
 fun AuthScreen(
@@ -67,87 +72,116 @@ fun AuthScreen(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = modifier.fillMaxSize()
     ) {
-        Text(
-            text = "Kaptal",
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+        // 1. Fond général
+        Image(
+            painter = painterResource(id = R.drawable.fond_kaptal_propre),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = 0.3f
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // 2. Logo central en filigrane
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_k_logo),
+                contentDescription = "Logo K Kaptal",
+                modifier = Modifier.fillMaxWidth(0.9f),
+                contentScale = ContentScale.Fit,
+                alpha = 0.15f
+            )
+        }
 
-        Text(
-            text = if (isSignUp) "Créer un compte" else "Connexion",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_kaptal_logo),
+                contentDescription = "Logo Kaptal",
+                modifier = Modifier.height(80.dp),
+                contentScale = ContentScale.Fit
+            )
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Adresse e-mail") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth()
-        )
+            if (isSignUp) {
+                Text(
+                    text = stringResource(R.string.auth_signup_title),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text(stringResource(R.string.auth_email_label)) },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Mot de passe") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            singleLine = true,
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            trailingIcon = {
-                val image = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
-                val description = if (passwordVisible) "Masquer le mot de passe" else "Afficher le mot de passe"
+            Spacer(modifier = Modifier.height(12.dp))
 
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(imageVector = image, contentDescription = description)
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text(stringResource(R.string.auth_password_label)) },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    val image = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
+                    val description = if (passwordVisible) "Masquer le mot de passe" else "Afficher le mot de passe"
 
-        // Indicateur de force affiché uniquement lors de la création de compte
-        AnimatedVisibility(visible = isSignUp) {
-            Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "Force du mot de passe :", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        text = when (passwordStrength) {
-                            0, 1 -> "Faible"
-                            2 -> "Moyen"
-                            3 -> "Bon"
-                            else -> "Très sécurisé"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = when (passwordStrength) {
-                            0, 1 -> Color.Red
-                            2 -> Color(0xFFFF9800) // Orange
-                            3 -> Color(0xFF8BC34A) // Vert clair
-                            else -> Color(0xFF4CAF50) // Vert
-                        }
-                    )
-                }
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(imageVector = image, contentDescription = description)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Indicateur de force affiché uniquement lors de la création de compte
+            AnimatedVisibility(visible = isSignUp) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = stringResource(R.string.auth_password_strength), style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = when (passwordStrength) {
+                                0, 1 -> stringResource(R.string.auth_password_weak)
+                                2 -> stringResource(R.string.auth_password_medium)
+                                3 -> stringResource(R.string.auth_password_good)
+                                else -> stringResource(R.string.auth_password_strong)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = when (passwordStrength) {
+                                0, 1 -> Color.Red
+                                2 -> Color(0xFFFF9800) // Orange
+                                3 -> Color(0xFF8BC34A) // Vert clair
+                                else -> Color(0xFF4CAF50) // Vert
+                            }
+                        )
+                    }
                 Spacer(modifier = Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { passwordStrength / 4f },
@@ -168,12 +202,12 @@ fun AuthScreen(
         Button(
             onClick = {
                 if (email.isBlank() || password.isBlank()) {
-                    Toast.makeText(context, "Veuillez remplir tous les champs", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.auth_error_fields_blank), Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
                 if (isSignUp && passwordStrength < 2) {
-                    Toast.makeText(context, "Veuillez choisir un mot de passe un peu plus sécurisé", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.auth_error_password_weak), Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
@@ -214,7 +248,7 @@ fun AuthScreen(
             if (isLoading) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
             } else {
-                Text(if (isSignUp) "S'inscrire" else "Se connecter", fontSize = 16.sp)
+                Text(if (isSignUp) stringResource(R.string.auth_signup_button) else stringResource(R.string.auth_login_button), fontSize = 16.sp)
             }
         }
 
@@ -222,8 +256,9 @@ fun AuthScreen(
 
         TextButton(onClick = { isSignUp = !isSignUp }) {
             Text(
-                if (isSignUp) "Déjà un compte ? Se connecter" else "Pas de compte ? S'inscrire"
+                if (isSignUp) stringResource(R.string.auth_go_to_login) else stringResource(R.string.auth_go_to_signup)
             )
         }
     }
+}
 }

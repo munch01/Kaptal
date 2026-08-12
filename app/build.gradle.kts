@@ -39,7 +39,6 @@ android {
 }
 
 dependencies {
-
     // --- Core & Lifecycle ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -61,8 +60,9 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-firestore-ktx")
 
-       // Biométrie Android
+    // Biométrie Android
     implementation("androidx.biometric:biometric:1.1.0")
+
     // --- Tests & Debug ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -72,17 +72,15 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // Firebase Bill of Materials (BoM)
-    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-
     // Dépendance pour ViewModel avec Jetpack Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
 
     // Navigation Jetpack Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    dependencies { implementation("androidx.compose.ui:ui-text-google-fonts:1.7.0") // Vérifie la dernière version
-    }
+    // PDF Parsing
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // Fonts
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.7.0")
 }

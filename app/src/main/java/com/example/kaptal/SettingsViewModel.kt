@@ -6,16 +6,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
     private val prefs = application.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
+
+    private val _languageChangedEvent = MutableSharedFlow<Unit>()
+    val languageChangedEvent = _languageChangedEvent.asSharedFlow()
 
     // --- ÉTATS OBSERVABLES PAR L'UI ---
     var isBiometricEnabled by mutableStateOf(prefs.getBoolean("biometric_enabled", false))
@@ -80,9 +88,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateLanguage(newLanguage: String) {
-        selectedLanguage = newLanguage
-        prefs.edit().putString("selected_language", newLanguage).apply()
-        syncUserSettingsToFirebase(mapOf("language" to newLanguage))
+        if (selectedLanguage != newLanguage) {
+            selectedLanguage = newLanguage
+            prefs.edit().putString("selected_language", newLanguage).apply()
+            syncUserSettingsToFirebase(mapOf("language" to newLanguage))
+            viewModelScope.launch {
+                _languageChangedEvent.emit(Unit)
+            }
+        }
     }
 
     fun updateBiometric(enabled: Boolean) {

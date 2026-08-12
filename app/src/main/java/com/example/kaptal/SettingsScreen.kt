@@ -3,6 +3,7 @@ package com.example.kaptal
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,11 +17,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.kaptal.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,22 +49,57 @@ fun SettingsScreen(
     val availableCurrencies = listOf("EUR (€)", "USD ($)", "GBP (£)")
     val availableLanguages = listOf("Français", "English", "Español")
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Paramètres", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. Fond général
+        Image(
+            painter = painterResource(id = R.drawable.fond_kaptal_propre),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            alpha = 0.3f
+        )
+
+        // 2. Logo central en filigrane
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_k_logo),
+                contentDescription = "Logo K Kaptal",
+                modifier = Modifier.fillMaxWidth(0.9f),
+                contentScale = ContentScale.Fit,
+                alpha = 0.15f
             )
         }
-    ) { paddingValues ->
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            stringResource(R.string.settings_title),
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_label))
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+        ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -69,7 +111,7 @@ fun SettingsScreen(
 
             // ================= 1. PROFIL ET COMPTE =================
             Text(
-                text = "Profil & Compte",
+                text = stringResource(R.string.settings_profile_section),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -77,7 +119,7 @@ fun SettingsScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
             ) {
                 Column {
                     Row(
@@ -93,12 +135,12 @@ fun SettingsScreen(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = currentUser?.displayName ?: "Utilisateur Kaptal",
+                                text = currentUser?.displayName ?: stringResource(R.string.settings_user_default),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = currentUser?.email ?: "Email non renseigné",
+                                text = currentUser?.email ?: stringResource(R.string.settings_email_not_set),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -109,8 +151,8 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         icon = Icons.Default.Email,
-                        title = "Adresse e-mail",
-                        subtitle = currentUser?.email ?: "Modifier votre adresse e-mail",
+                        title = stringResource(R.string.settings_email_title),
+                        subtitle = currentUser?.email ?: stringResource(R.string.settings_email_subtitle),
                         onClick = { showEmailDialog = true }
                     )
                 }
@@ -120,7 +162,7 @@ fun SettingsScreen(
 
             // ================= 2. SÉCURITÉ =================
             Text(
-                text = "Sécurité",
+                text = stringResource(R.string.settings_security_section),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -128,7 +170,7 @@ fun SettingsScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
             ) {
                 Column {
                     Row(
@@ -143,8 +185,8 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Column {
-                                Text("Verrouillage biométrique", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                Text("Demander l'empreinte à l'ouverture", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.settings_biometric_title), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.settings_biometric_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
 
@@ -160,8 +202,8 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         icon = Icons.Default.Lock,
-                        title = "Mot de passe",
-                        subtitle = "Envoyer un e-mail de réinitialisation",
+                        title = stringResource(R.string.settings_password_title),
+                        subtitle = stringResource(R.string.settings_password_subtitle),
                         onClick = {
                             viewModel.sendPasswordResetEmail { success, message ->
                                 Toast.makeText(context, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
@@ -175,7 +217,7 @@ fun SettingsScreen(
 
             // ================= 3. PRÉFÉRENCES =================
             Text(
-                text = "Préférences",
+                text = stringResource(R.string.settings_preferences_section),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -183,12 +225,12 @@ fun SettingsScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
             ) {
                 Column {
                     SettingsClickableItem(
                         icon = Icons.Default.CurrencyExchange,
-                        title = "Devise principale",
+                        title = stringResource(R.string.settings_currency_title),
                         subtitle = viewModel.selectedCurrency,
                         onClick = { showCurrencyDialog = true }
                     )
@@ -197,7 +239,7 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         icon = Icons.Default.Language,
-                        title = "Langue de l'application",
+                        title = stringResource(R.string.settings_language_title),
                         subtitle = viewModel.selectedLanguage,
                         onClick = { showLanguageDialog = true }
                     )
@@ -208,7 +250,7 @@ fun SettingsScreen(
 
             // ================= 4. DÉVELOPPEMENT & LÉGAL =================
             Text(
-                text = "À propos & Légal",
+                text = stringResource(R.string.settings_about_section),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -216,13 +258,13 @@ fun SettingsScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
             ) {
                 Column {
                     SettingsClickableItem(
                         icon = Icons.Default.Code,
-                        title = "Projet GitHub",
-                        subtitle = "Consulter le code source",
+                        title = stringResource(R.string.settings_github_title),
+                        subtitle = stringResource(R.string.settings_github_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal"))
@@ -234,8 +276,8 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         icon = Icons.Default.Gavel,
-                        title = "Logiciels open source",
-                        subtitle = "Licences des bibliothèques tierces",
+                        title = stringResource(R.string.settings_open_source_title),
+                        subtitle = stringResource(R.string.settings_open_source_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE"))
@@ -247,8 +289,8 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         icon = Icons.Default.PrivacyTip,
-                        title = "Politique de confidentialité (RGPD)",
-                        subtitle = "Gestion et protection de vos données",
+                        title = stringResource(R.string.settings_privacy_title),
+                        subtitle = stringResource(R.string.settings_privacy_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/PRIVACY.md"))
@@ -260,14 +302,53 @@ fun SettingsScreen(
 
                     SettingsClickableItem(
                         icon = Icons.Default.Info,
-                        title = "À propos de Kaptal",
-                        subtitle = "Version 1.0.0",
+                        title = stringResource(R.string.settings_about_title),
+                        subtitle = stringResource(R.string.settings_version, "1.0.0"),
                         onClick = { showAboutDialog = true }
                     )
                 }
             }
 
-            // ================= 5. DÉCONNEXION & SUPPRESSION =================
+            HorizontalDivider()
+
+            // ================= 5. DONNÉES & SAUVEGARDE (RGPD) =================
+            Text(
+                text = stringResource(R.string.section_backup),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+            ) {
+                Column {
+                    SettingsClickableItem(
+                        icon = Icons.Default.FileDownload,
+                        title = stringResource(R.string.export_csv),
+                        subtitle = "Exporter mes transactions au format Excel",
+                        onClick = {
+                            Toast.makeText(context, "Export CSV en cours...", Toast.LENGTH_SHORT).show()
+                            // TODO: Implémenter l'export réel
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                    SettingsClickableItem(
+                        icon = Icons.Default.DataObject,
+                        title = stringResource(R.string.export_json),
+                        subtitle = "Exporter mes données personnelles (Portabilité)",
+                        onClick = {
+                            Toast.makeText(context, "Export JSON en cours...", Toast.LENGTH_SHORT).show()
+                            // TODO: Implémenter l'export réel
+                        }
+                    )
+                }
+            }
+
+            // ================= 6. DÉCONNEXION & SUPPRESSION =================
             OutlinedButton(
                 onClick = {
                     viewModel.signOut()
@@ -278,7 +359,7 @@ fun SettingsScreen(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Se déconnecter")
+                Text(stringResource(R.string.settings_logout))
             }
 
             Button(
@@ -288,7 +369,7 @@ fun SettingsScreen(
             ) {
                 Icon(Icons.Default.DeleteForever, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Supprimer mon compte")
+                Text(stringResource(R.string.settings_delete_account))
             }
         }
     }
@@ -297,7 +378,7 @@ fun SettingsScreen(
     if (showCurrencyDialog) {
         AlertDialog(
             onDismissRequest = { showCurrencyDialog = false },
-            title = { Text("Choisir la devise") },
+            title = { Text(stringResource(R.string.settings_currency_dialog)) },
             text = {
                 Column {
                     availableCurrencies.forEach { curr ->
@@ -325,14 +406,14 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text("Annuler") } }
+            dismissButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text(stringResource(R.string.cancel_label)) } }
         )
     }
 
     if (showLanguageDialog) {
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
-            title = { Text("Choisir la langue") },
+            title = { Text(stringResource(R.string.settings_language_dialog)) },
             text = {
                 Column {
                     availableLanguages.forEach { lang ->
@@ -360,21 +441,21 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showLanguageDialog = false }) { Text("Annuler") } }
+            dismissButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(stringResource(R.string.cancel_label)) } }
         )
     }
 
     if (showEmailDialog) {
         AlertDialog(
             onDismissRequest = { showEmailDialog = false },
-            title = { Text("Changer d'adresse e-mail") },
+            title = { Text(stringResource(R.string.settings_email_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Saisissez votre nouvelle adresse email :")
+                    Text(stringResource(R.string.settings_email_dialog_text))
                     OutlinedTextField(
                         value = newEmailText,
                         onValueChange = { newEmailText = it },
-                        label = { Text("Nouvel Email") },
+                        label = { Text(stringResource(R.string.settings_email_new_label)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -389,9 +470,9 @@ fun SettingsScreen(
                             showEmailDialog = false
                         }
                     }
-                ) { Text("Mettre à jour") }
+                ) { Text(stringResource(R.string.settings_email_update_button)) }
             },
-            dismissButton = { TextButton(onClick = { showEmailDialog = false }) { Text("Annuler") } }
+            dismissButton = { TextButton(onClick = { showEmailDialog = false }) { Text(stringResource(R.string.cancel_label)) } }
         )
     }
 
@@ -399,24 +480,24 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
             icon = { Icon(Icons.Default.Info, contentDescription = null) },
-            title = { Text("Kaptal") },
+            title = { Text(stringResource(R.string.settings_about_title)) },
             text = {
                 Column {
-                    Text("Application de gestion financière personnelle.")
+                    Text(stringResource(R.string.settings_about_description))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Version : 1.0.0", fontWeight = FontWeight.Bold)
-                    Text("Architecture MVVM avec Jetpack Compose & Firebase.")
+                    Text(stringResource(R.string.settings_version, "1.0.0"), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_about_tech))
                 }
             },
-            confirmButton = { TextButton(onClick = { showAboutDialog = false }) { Text("Fermer") } }
+            confirmButton = { TextButton(onClick = { showAboutDialog = false }) { Text(stringResource(R.string.close_label)) } }
         )
     }
 
     if (showDeleteAccountDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAccountDialog = false },
-            title = { Text("Supprimer définitivement le compte ?") },
-            text = { Text("Cette action est irréversible. Toutes vos données seront effacées.") },
+            title = { Text(stringResource(R.string.settings_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_delete_confirm_text)) },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -427,12 +508,14 @@ fun SettingsScreen(
                             if (success) onBackClick()
                         }
                     }
-                ) { Text("Confirmer la suppression") }
+                ) { Text(stringResource(R.string.settings_delete_confirm_button)) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteAccountDialog = false }) { Text("Annuler") } }
+            dismissButton = { TextButton(onClick = { showDeleteAccountDialog = false }) { Text(stringResource(R.string.cancel_label)) } }
         )
     }
 }
+}
+
 
 @Composable
 private fun SettingsClickableItem(

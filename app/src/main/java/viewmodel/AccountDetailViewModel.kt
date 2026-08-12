@@ -15,6 +15,9 @@ import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Locale
 
+import java.util.Date
+import kotlin.math.abs
+
 enum class RecurrenceEditScope {
     ALL,
     THIS_AND_FUTURE,
@@ -117,6 +120,106 @@ class AccountDetailViewModel : ViewModel() {
                     .await()
             } catch (e: Exception) {
                 Log.e("UPDATE_DEBUG", "Erreur modification transaction", e)
+            }
+        }
+    }
+
+    fun performTransfer(
+        sourceAccountId: String,
+        targetAccountId: String,
+        amount: Double,
+        title: String,
+        date: Timestamp,
+        isRecurring: Boolean,
+        recurrenceInterval: String?,
+        endDate: Timestamp?
+    ) {
+        viewModelScope.launch {
+            try {
+                val absAmount = abs(amount)
+                
+                // 1. Transaction sortante (débit)
+                val outTx = Transaction(
+                    title = title,
+                    amount = -absAmount,
+                    type = "TRANSFER",
+                    familyCategory = "Virement",
+                    subCategory = "Virement interne",
+                    date = date,
+                    isRecurring = isRecurring,
+                    recurrenceInterval = recurrenceInterval,
+                    endDate = endDate,
+                    checkedMonths = emptyList()
+                )
+                db.collection("accounts").document(sourceAccountId).collection("transactions").add(outTx).await()
+
+                // 2. Transaction entrante (crédit)
+                val inTx = Transaction(
+                    title = title,
+                    amount = absAmount,
+                    type = "TRANSFER",
+                    familyCategory = "Virement",
+                    subCategory = "Virement interne",
+                    date = date,
+                    isRecurring = isRecurring,
+                    recurrenceInterval = recurrenceInterval,
+                    endDate = endDate,
+                    checkedMonths = emptyList()
+                )
+                db.collection("accounts").document(targetAccountId).collection("transactions").add(inTx).await()
+            } catch (e: Exception) {
+                Log.e("TRANSFER_DEBUG", "Erreur lors du virement", e)
+            }
+        }
+    }
+
+    fun generateInstallments(
+        accountId: String,
+        linkedAccountId: String?,
+        amount: Double,
+        months: Int,
+        startDate: Date,
+        title: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val cal = Calendar.getInstance().apply { time = startDate }
+                val transactionsRef = db.collection("accounts").document(accountId).collection("transactions")
+                val linkedRef = linkedAccountId?.let { db.collection("accounts").document(it).collection("transactions") }
+
+                for (i in 0 until months) {
+                    val date = Timestamp(cal.time)
+                    
+                    // 1. Crédit (Réduction de la dette)
+                    val creditTx = Transaction(
+                        title = title,
+                        amount = abs(amount),
+                        type = "INCOME",
+                        familyCategory = "Crédit",
+                        subCategory = "Mensualité",
+                        date = date,
+                        checkedMonths = emptyList()
+                    )
+                    transactionsRef.add(creditTx)
+                    
+                    // 2. Débit (Sortie d'argent du compte lié)
+                    if (linkedRef != null) {
+                        val debitTx = Transaction(
+                            title = title,
+                            amount = -abs(amount),
+                            type = "EXPENSE",
+                            familyCategory = "Crédit",
+                            subCategory = "Mensualité",
+                            date = date,
+                            checkedMonths = emptyList()
+                        )
+                        linkedRef.add(debitTx)
+                    }
+                    
+                    cal.add(Calendar.MONTH, 1)
+                }
+            } catch (e: Exception) {
+                Log.e("CREDIT_DEBUG", "Erreur génération mensualités", e)
             }
         }
     }

@@ -10,5 +10,6 @@ data class Account(
     val color: String = "#2196F3",
     val order: Int = 0,
     val members: List<String> = emptyList(),
-    val ownerId: String = "" // <-- C'est ce champ qui manquait dans votre data class
+    val ownerId: String = "",
+    val linkedAccountId: String? = null
 )

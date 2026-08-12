@@ -1,0 +1,210 @@
+<resources>
+    <string name="app_name">Kaptal</string>
+
+    <!-- Navegación y Ajustes Generales -->
+    <string name="settings_title">Ajustes</string>
+    <string name="back">Atrás</string>
+    <string name="logout">Cerrar sesión</string>
+
+    <!-- Auth -->
+    <string name="auth_signup_title">Crear una cuenta</string>
+    <string name="auth_email_label">Correo electrónico</string>
+    <string name="auth_password_label">Contraseña</string>
+    <string name="auth_password_weak">Débil</string>
+    <string name="auth_password_medium">Media</string>
+    <string name="auth_password_good">Buena</string>
+    <string name="auth_password_strong">Muy segura</string>
+    <string name="auth_password_strength">Fuerza de la contraseña:</string>
+    <string name="auth_login_button">Iniciar sesión</string>
+    <string name="auth_signup_button">Registrarse</string>
+    <string name="auth_go_to_signup">¿No tienes cuenta? Regístrate</string>
+    <string name="auth_go_to_login">¿Ya tienes cuenta? Inicia sesión</string>
+    <string name="auth_error_fields_blank">Por favor, rellena todos los campos</string>
+    <string name="auth_error_password_weak">Por favor, elige una contraseña más segura</string>
+    <string name="auth_success_member_added">¡Miembro añadido con éxito!</string>
+
+    <!-- Home -->
+    <string name="home_title">Mis Cuentas</string>
+    <string name="home_quit">Salir</string>
+    <string name="home_bug_report">Error</string>
+    <string name="home_settings">Ajustes</string>
+    <string name="home_add">Añadir</string>
+    <string name="home_retry">Reintentar</string>
+    <string name="home_no_accounts">No hay cuentas bancarias configuradas.</string>
+    <string name="home_kofi">Café</string>
+
+    <!-- Account Dialogs -->
+    <string name="account_add_title">Añadir una cuenta</string>
+    <string name="account_edit_title">Editar cuenta</string>
+    <string name="account_delete_confirm_title">¿Eliminar esta cuenta?</string>
+    <string name="account_delete_confirm_text">¿Realmente quieres eliminar « %1$s »?</string>
+    <string name="account_name_label">Nombre de la cuenta</string>
+    <string name="account_bank_label">Institución / Plataforma</string>
+    <string name="account_type_label">Tipo de cuenta</string>
+    <string name="account_type_livret_a">Livret A (Ahorros)</string>
+    <string name="account_type_checking">Corriente</string>
+    <string name="account_type_savings">Ahorros</string>
+    <string name="account_type_credit">Crédito</string>
+    <string name="account_type_crypto">Crypto</string>
+    <string name="account_crypto_asset">Activo / Moneda</string>
+    <string name="account_crypto_quantity">Cantidad de %1$s</string>
+    <string name="account_initial_balance">Saldo inicial</string>
+    <string name="account_color">Color</string>
+    <string name="account_shared_checkbox">Cuenta compartida / conjunta</string>
+    <string name="account_add_member_label">Añadir un cotitular (Email)</string>
+    <string name="account_save">Guardar</string>
+    <string name="account_shared">Compartida</string>
+
+    <!-- Standard Account Detail -->
+    <string name="account_detail_real_balance">Saldo Real</string>
+    <string name="account_detail_projected_balance">Saldo Proyectado</string>
+    <string name="account_detail_operations">Operaciones</string>
+    <string name="account_detail_no_operations">No hay operaciones para este mes</string>
+    <string name="account_detail_chart">Distribución por categoría</string>
+    <string name="account_detail_add_operation">Añadir operación</string>
+
+    <!-- Transaction Dialogs -->
+    <string name="recurrence_edit_title">Editar operación recurrente</string>
+    <string name="recurrence_edit_text">¿Cómo deseas aplicar este cambio en la recurrencia?</string>
+    <string name="recurrence_all">Toda la serie</string>
+    <string name="recurrence_future">Este mes y los futuros</string>
+    <string name="recurrence_this_only">Solo esta ocurrencia</string>
+    <string name="recurrence_delete_title">Eliminar recurrencia</string>
+    <string name="recurrence_delete_text">Esta operación es recurrente. ¿Deseas eliminar toda la serie, solo a partir de este mes, o solo este mes?</string>
+    <string name="transaction_delete_title">Eliminar operación</string>
+    <string name="transaction_delete_text">¿Realmente quieres eliminar la operación « %1$s »?</string>
+
+    <!-- Categories -->
+    <string name="category_distribution">Distribución por categoría</string>
+    <string name="category_expenses_for">Gastos de %1$s</string>
+    <string name="category_no_expenses">No hay gastos este mes</string>
+    <string name="category_close">Cerrar</string>
+
+    <!-- Settings -->
+    <string name="settings_profile_section">Perfil y Cuenta</string>
+    <string name="settings_user_default">Usuario Kaptal</string>
+    <string name="settings_email_not_set">Email no proporcionado</string>
+    <string name="settings_email_title">Correo electrónico</string>
+    <string name="settings_email_subtitle">Editar tu correo electrónico</string>
+    <string name="settings_security_section">Seguridad</string>
+    <string name="settings_biometric_title">Bloqueo biométrico</string>
+    <string name="settings_biometric_subtitle">Solicitar huella al abrir</string>
+    <string name="settings_password_title">Contraseña</string>
+    <string name="settings_password_subtitle">Enviar un email de restablecimiento</string>
+    <string name="settings_preferences_section">Preferencias</string>
+    <string name="settings_currency_title">Moneda principal</string>
+    <string name="settings_language_title">Idioma de la aplicación</string>
+    <string name="settings_about_section">Acerca de y Legal</string>
+    <string name="settings_github_title">Proyecto GitHub</string>
+    <string name="settings_github_subtitle">Ver código fuente</string>
+    <string name="settings_open_source_title">Software de código abierto</string>
+    <string name="settings_open_source_subtitle">Licencias de bibliotecas de terceros</string>
+    <string name="settings_privacy_title">Política de privacidad (RGPD)</string>
+    <string name="settings_privacy_subtitle">Gestión y protección de tus datos</string>
+    <string name="settings_about_title">Acerca de Kaptal</string>
+    <string name="settings_version">Versión %1$s</string>
+    <string name="settings_logout">Cerrar sesión</string>
+    <string name="settings_delete_account">Eliminar mi cuenta</string>
+
+    <!-- Settings Dialogs -->
+    <string name="settings_currency_dialog">Elegir moneda</string>
+    <string name="settings_language_dialog">Elegir idioma</string>
+    <string name="settings_email_dialog_title">Cambiar correo electrónico</string>
+    <string name="settings_email_dialog_text">Introduce tu nuevo correo electrónico:</string>
+    <string name="settings_email_new_label">Nuevo Email</string>
+    <string name="settings_email_update_button">Actualizar</string>
+    <string name="settings_about_description">Aplicación de gestión financiera personal.</string>
+    <string name="settings_about_tech">Arquitectura MVVM con Jetpack Compose y Firebase.</string>
+    <string name="settings_delete_confirm_title">¿Eliminar cuenta permanentemente?</string>
+    <string name="settings_delete_confirm_text">Esta acción es irreversible. Todos tus datos serán borrados.</string>
+    <string name="settings_delete_confirm_button">Confirmar eliminación</string>
+
+    <!-- Add/Edit Transaction -->
+    <string name="tx_new_title">Nueva operación</string>
+    <string name="tx_edit_title">Editar operación</string>
+    <string name="tx_type_expense">Gasto</string>
+    <string name="tx_type_income">Ingreso</string>
+    <string name="tx_label_hint">Etiqueta (ej: Compras, Salario...)</string>
+    <string name="tx_amount_hint">Monto (€)</string>
+    <string name="tx_family_label">Gran familia de gastos</string>
+    <string name="tx_subcategory_label">Subcategoría</string>
+    <string name="tx_income_category_label">Categoría de ingresos</string>
+    <string name="tx_payment_method_label">Fuente de fondos / Pago</string>
+    <string name="tx_date_prefix">Fecha: %1$s</string>
+    <string name="tx_recurring_label">Operación recurrente (mensual)</string>
+    <string name="tx_end_date_prefix">Fecha de fin: %1$s</string>
+    <string name="tx_end_date_none">Sin fecha de fin (Infinito)</string>
+    <string name="tx_clear_end_date">Borrar fecha de fin (Infinito)</string>
+    <string name="tx_save_button">Guardar</string>
+    <string name="tx_edit_button">Editar</string>
+    <string name="tx_income_family">Ingresos</string>
+
+    <!-- Add Account Screen (Alternative) -->
+    <string name="add_account_title">Añadir una cuenta</string>
+    <string name="add_account_name_error">El nombre de la cuenta es obligatorio</string>
+    <string name="add_account_bank_hint">Nombre del banco (ej: Boursorama, Revolut...)</string>
+    <string name="add_account_balance_error">Por favor, introduce un monto válido</string>
+    <string name="add_account_create_button">Crear cuenta</string>
+
+    <!-- Biometric & Lock -->
+    <string name="lock_title">Kaptal está bloqueado</string>
+    <string name="lock_unlock_button">Desbloquear con huella</string>
+    <string name="lock_use_password_button">Usar contraseña</string>
+    <string name="biometric_prompt_title">Desbloqueo de Kaptal</string>
+    <string name="biometric_prompt_subtitle">Escanea tu huella para acceder a la aplicación</string>
+    <string name="biometric_error_required">Se requiere huella para abrir la aplicación</string>
+
+    <!-- Methods and Types -->
+    <string name="account_type_cash">Efectivo</string>
+    <string name="payment_method_cb">Tarjeta</string>
+    <string name="payment_method_cash">Efectivo</string>
+    <string name="payment_method_transfer">Transferencia</string>
+    <string name="payment_method_check">Cheque</string>
+
+    <!-- Income Categories -->
+    <string name="income_cat_salary">Salario</string>
+    <string name="income_cat_health">Reembolso salud</string>
+    <string name="income_cat_transfer_internal">Transferencia interna</string>
+    <string name="income_cat_transfer_external">Transferencia diversa</string>
+    <string name="income_cat_taxes">Impuestos</string>
+    <string name="income_cat_other">Otros / Diversos</string>
+
+    <!-- Transfers -->
+    <string name="tx_type_transfer">Transferencia</string>
+    <string name="tx_target_account_label">A la cuenta</string>
+    <string name="tx_source_account_label">Desde la cuenta</string>
+    <string name="tx_transfer_description">Transferencia a %1$s</string>
+    <string name="tx_transfer_from_description">Transferencia desde %1$s</string>
+
+    <!-- Credit -->
+    <string name="credit_generate_button">Generar cuotas</string>
+    <string name="credit_linked_account_label">Debitado de: %1$s</string>
+    <string name="credit_pdf_import">Importar PDF (Amortización)</string>
+    <string name="credit_setup_title">Configuración del Crédito</string>
+    <string name="credit_installment_amount">Monto de la cuota mensual</string>
+    <string name="credit_duration_months">Duración (meses)</string>
+    <string name="credit_start_date">Fecha de inicio</string>
+
+    <!-- Livret A -->
+    <string name="livret_a_interests_title">Intereses (Estimación)</string>
+    <string name="livret_a_rate_label">Tasa anual: %1$s%%</string>
+    <string name="livret_a_projected_interests">Intereses acumulados al 31/12:</string>
+    <string name="livret_a_rule_notice">Calculado según la regla de los 15 días</string>
+
+    <!-- Crypto & Credit -->
+    <string name="crypto_title">Criptomonedas</string>
+    <string name="crypto_dev_status">Seguimiento Crypto en desarrollo</string>
+    <string name="credit_title">Pantalla de Crédito: %1$s</string>
+
+    <!-- Common -->
+    <string name="back_label">Atrás</string>
+    <string name="cancel_label">Cancelar</string>
+    <string name="delete_label">Eliminar</string>
+    <string name="close_label">Cerrar</string>
+    <string name="validate">Validar</string>
+
+    <!-- Backup Section -->
+    <string name="section_backup">Datos y Copia de seguridad</string>
+    <string name="export_csv">Exportar CSV</string>
+    <string name="export_json">Exportar JSON</string>
+</resources>
