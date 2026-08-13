@@ -59,37 +59,40 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             KaptalTheme {
-                var showSplash by remember { mutableStateOf(true) }
+                val context = LocalContext.current
+                CompositionLocalProvider(LocalContext provides LocaleHelper.setLocale(context, lang)) {
+                    var showSplash by remember { mutableStateOf(true) }
 
-                LaunchedEffect(Unit) {
-                    delay(1200)
-                    showSplash = false
-                }
+                    LaunchedEffect(Unit) {
+                        delay(1200)
+                        showSplash = false
+                    }
 
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFFE8ECEF)
-                ) {
-                    if (showSplash) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.fond_kaptal_propre),
-                                contentDescription = null,
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color(0xFFE8ECEF)
+                    ) {
+                        if (showSplash) {
+                            Box(
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_k_logo),
-                                contentDescription = "Logo Kaptal",
-                                modifier = Modifier.size(160.dp),
-                                contentScale = ContentScale.Fit
-                            )
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.fond_kaptal_propre),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_k_logo),
+                                    contentDescription = "Logo Kaptal",
+                                    modifier = Modifier.size(160.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        } else {
+                            KaptalApp(activity = this@MainActivity)
                         }
-                    } else {
-                        KaptalApp(activity = this@MainActivity)
                     }
                 }
             }
@@ -127,10 +130,14 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel(), settingsViewModel: SettingsViewModel = viewModel()) {
+fun KaptalApp(
+    activity: FragmentActivity,
+    viewModel: MainViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel()
+) {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
-    val context = activity.applicationContext
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         settingsViewModel.languageChangedEvent.collect {
@@ -208,7 +215,8 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
                         navController.popBackStack()
                     },
                     allAccounts = allAccounts,
-                    allBalances = allBalances
+                    allBalances = allBalances,
+                    viewModel = settingsViewModel
                 )
             }
 

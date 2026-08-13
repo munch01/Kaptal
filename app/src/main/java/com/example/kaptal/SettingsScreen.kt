@@ -61,17 +61,17 @@ fun SettingsScreen(
             context.contentResolver.openOutputStream(it)?.use { stream ->
                 stream.write(data.toByteArray())
             }
-            Toast.makeText(context, "Données exportées (JSON)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
         }
     }
 
-    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/comma-separated-values")) { uri ->
         uri?.let {
             val data = viewModel.getExportDataCsv(allAccounts, allBalances)
             context.contentResolver.openOutputStream(it)?.use { stream ->
                 stream.write(data.toByteArray())
             }
-            Toast.makeText(context, "Données exportées (CSV)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
         }
     }
 
