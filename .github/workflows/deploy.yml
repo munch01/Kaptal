@@ -36,6 +36,8 @@ jobs:
           alias: ${{ secrets.PLAY_STORE_ALIAS }}
           keyStorePassword: ${{ secrets.PLAY_STORE_KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.PLAY_STORE_KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "34.0.0"
 
       - name: Upload to Google Play (Internal)
         uses: r0adkll/upload-google-play@v1
@@ -43,4 +45,4 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.Muncho.kaptal
           releaseFiles: ${{ steps.sign_app.outputs.signedReleaseFile }}
-          track: internal
+          tracks: internal
