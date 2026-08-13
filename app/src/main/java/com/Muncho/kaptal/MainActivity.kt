@@ -55,15 +55,10 @@ class MainActivity : FragmentActivity() {
 
         val prefs = getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
-        LocaleHelper.setLocale(this, lang)
 
         setContent {
-            KaptalTheme {
-                val context = LocalContext.current
-                CompositionLocalProvider(
-                    LocalActivity provides this@MainActivity,
-                    LocalContext provides LocaleHelper.setLocale(context, lang)
-                ) {
+            CompositionLocalProvider(LocalActivity provides this@MainActivity) {
+                KaptalTheme {
                     var showSplash by remember { mutableStateOf(true) }
 
                     LaunchedEffect(Unit) {
@@ -130,10 +125,6 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
-}
-
-val LocalActivity = staticCompositionLocalOf<FragmentActivity> {
-    error("No Activity found")
 }
 
 @Composable

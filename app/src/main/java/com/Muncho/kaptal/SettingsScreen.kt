@@ -41,6 +41,7 @@ fun SettingsScreen(
     allBalances: Map<String, Double> = emptyMap(),
     viewModel: SettingsViewModel = viewModel()
 ) {
+    val activity = LocalActivity.current
     val context = LocalContext.current
     val currentUser = viewModel.currentUser
 
@@ -59,27 +60,27 @@ fun SettingsScreen(
         try {
             uri?.let {
                 val data = viewModel.getExportDataJson(allAccounts, allBalances)
-                context.contentResolver.openOutputStream(it)?.use { stream ->
+                activity.contentResolver.openOutputStream(it)?.use { stream ->
                     stream.write(data.toByteArray())
                 }
-                Toast.makeText(context, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Erreur lors de l'export JSON", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "Erreur lors de l'export JSON", Toast.LENGTH_SHORT).show()
         }
     }
 
-    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/comma-separated-values")) { uri ->
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         try {
             uri?.let {
                 val data = viewModel.getExportDataCsv(allAccounts, allBalances)
-                context.contentResolver.openOutputStream(it)?.use { stream ->
+                activity.contentResolver.openOutputStream(it)?.use { stream ->
                     stream.write(data.toByteArray())
                 }
-                Toast.makeText(context, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Erreur lors de l'export CSV", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "Erreur lors de l'export CSV", Toast.LENGTH_SHORT).show()
         }
     }
 
