@@ -12,8 +12,8 @@ android {
         applicationId = "com.Muncho.kaptal"
         minSdk = 26
         targetSdk = 35
-        versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 1
-        versionName = project.findProperty("versionName")?.toString() ?: "1.0"
+        versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 2
+        versionName = project.findProperty("versionName")?.toString() ?: "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
