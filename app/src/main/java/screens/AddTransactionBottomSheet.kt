@@ -1,4 +1,4 @@
-package com.example.kaptal.screens
+package com.Muncho.kaptal.screens
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
@@ -13,10 +13,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.kaptal.R
-import com.example.kaptal.model.Account
-import com.example.kaptal.model.Transaction
-import com.example.kaptal.model.transactionCategories
+import com.Muncho.kaptal.R
+import com.Muncho.kaptal.findActivity
+import com.Muncho.kaptal.model.Account
+import com.Muncho.kaptal.model.Transaction
+import com.Muncho.kaptal.model.transactionCategories
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -333,9 +334,10 @@ fun AddTransactionBottomSheet(
             item {
                 OutlinedButton(
                     onClick = {
+                        val activity = context.findActivity() ?: return@OutlinedButton
                         val cal = Calendar.getInstance().apply { time = selectedDate }
                         DatePickerDialog(
-                            context,
+                            activity,
                             { _, year, month, dayOfMonth ->
                                 val newCal = Calendar.getInstance().apply { set(year, month, dayOfMonth) }
                                 selectedDate = newCal.time
@@ -369,10 +371,11 @@ fun AddTransactionBottomSheet(
                 item {
                     OutlinedButton(
                         onClick = {
+                            val activity = context.findActivity() ?: return@OutlinedButton
                             val baseDate = endDate ?: Date()
                             val cal = Calendar.getInstance().apply { time = baseDate }
                             DatePickerDialog(
-                                context,
+                                activity,
                                 { _, year, month, dayOfMonth ->
                                     val newCal = Calendar.getInstance().apply { set(year, month, dayOfMonth) }
                                     endDate = newCal.time

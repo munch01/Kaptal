@@ -1,4 +1,4 @@
-package com.example.kaptal.screens
+package com.Muncho.kaptal.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,9 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.kaptal.R
-import com.example.kaptal.model.Account
-import com.example.kaptal.viewmodel.AccountDetailViewModel
+import com.Muncho.kaptal.R
+import com.Muncho.kaptal.model.Account
+import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
 import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)

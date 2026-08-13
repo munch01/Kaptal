@@ -1,9 +1,9 @@
-package com.example.kaptal.viewmodel
+package com.Muncho.kaptal.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.kaptal.model.Transaction
+import com.Muncho.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration

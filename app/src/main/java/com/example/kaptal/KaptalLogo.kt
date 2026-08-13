@@ -1,4 +1,4 @@
-package com.example.kaptal // Vérifie ton package
+package com.Muncho.kaptal
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize

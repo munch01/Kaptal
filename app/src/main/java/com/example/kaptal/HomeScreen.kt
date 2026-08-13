@@ -1,4 +1,4 @@
-package com.example.kaptal
+package com.Muncho.kaptal
 
 import android.app.Activity
 import android.content.Intent
@@ -39,7 +39,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.kaptal.model.Account
+import com.Muncho.kaptal.model.Account
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,13 +102,15 @@ fun HomeScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { (context as? Activity)?.finish() }) {
+                        IconButton(onClick = { context.findActivity()?.finish() }) {
                             Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = stringResource(R.string.home_quit))
                         }
                     },
                     actions = {
                         IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/issues"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/issues")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
                             context.startActivity(intent)
                         }) {
                             Icon(Icons.Default.Feedback, contentDescription = stringResource(R.string.home_bug_report))
@@ -252,7 +254,9 @@ fun HomeScreen(
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
                     .clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho"))
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
                         context.startActivity(intent)
                     },
                 shape = RoundedCornerShape(24.dp),

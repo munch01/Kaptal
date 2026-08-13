@@ -1,6 +1,6 @@
-package com.example.kaptal.data
+package com.Muncho.kaptal.data
 
-import com.example.kaptal.model.Account
+import com.Muncho.kaptal.model.Account
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await

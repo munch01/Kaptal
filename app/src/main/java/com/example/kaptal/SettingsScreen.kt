@@ -1,8 +1,10 @@
-package com.example.kaptal
+package com.Muncho.kaptal
 
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,12 +30,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.kaptal.R
+import com.Muncho.kaptal.R
+import com.Muncho.kaptal.model.Account
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
+    allAccounts: List<Account> = emptyList(),
+    allBalances: Map<String, Double> = emptyMap(),
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -49,6 +54,26 @@ fun SettingsScreen(
 
     val availableCurrencies = listOf("EUR (€)", "USD ($)", "GBP (£)")
     val availableLanguages = listOf("Français", "English", "Español")
+
+    val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let {
+            val data = viewModel.getExportDataJson(allAccounts, allBalances)
+            context.contentResolver.openOutputStream(it)?.use { stream ->
+                stream.write(data.toByteArray())
+            }
+            Toast.makeText(context, "Données exportées (JSON)", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let {
+            val data = viewModel.getExportDataCsv(allAccounts, allBalances)
+            context.contentResolver.openOutputStream(it)?.use { stream ->
+                stream.write(data.toByteArray())
+            }
+            Toast.makeText(context, "Données exportées (CSV)", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -272,7 +297,9 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_github_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
                             context.startActivity(intent)
                         }
                     )
@@ -285,7 +312,9 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_open_source_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
                             context.startActivity(intent)
                         }
                     )
@@ -298,7 +327,9 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_privacy_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/PRIVACY.md"))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/PRIVACY.md")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
                             context.startActivity(intent)
                         }
                     )
@@ -334,8 +365,7 @@ fun SettingsScreen(
                         title = stringResource(R.string.export_csv),
                         subtitle = "Exporter mes transactions au format Excel",
                         onClick = {
-                            Toast.makeText(context, "Export CSV en cours...", Toast.LENGTH_SHORT).show()
-                            // TODO: Implémenter l'export réel
+                            csvLauncher.launch("Kaptal_Export_${System.currentTimeMillis()}.csv")
                         }
                     )
 
@@ -346,8 +376,7 @@ fun SettingsScreen(
                         title = stringResource(R.string.export_json),
                         subtitle = "Exporter mes données personnelles (Portabilité)",
                         onClick = {
-                            Toast.makeText(context, "Export JSON en cours...", Toast.LENGTH_SHORT).show()
-                            // TODO: Implémenter l'export réel
+                            jsonLauncher.launch("Kaptal_Data_${System.currentTimeMillis()}.json")
                         }
                     )
                 }

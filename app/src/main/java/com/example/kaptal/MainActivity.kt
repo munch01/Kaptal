@@ -1,4 +1,4 @@
-package com.example.kaptal
+package com.Muncho.kaptal
 
 import android.content.Context
 import android.os.Bundle
@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -23,10 +24,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.kaptal.screens.CreditAccountScreen
-import com.example.kaptal.screens.CryptoScreen
-import com.example.kaptal.screens.StandardAccountScreen
-import com.example.kaptal.ui.theme.KaptalTheme
+import com.Muncho.kaptal.screens.CreditAccountScreen
+import com.Muncho.kaptal.screens.CryptoScreen
+import com.Muncho.kaptal.screens.StandardAccountScreen
+import com.Muncho.kaptal.ui.theme.KaptalTheme
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType
@@ -58,40 +59,37 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             KaptalTheme {
-                val context = LocalContext.current
-                CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides LocaleHelper.setLocale(context, lang)) {
-                    var showSplash by remember { mutableStateOf(true) }
+                var showSplash by remember { mutableStateOf(true) }
 
-                    LaunchedEffect(Unit) {
-                        delay(1200)
-                        showSplash = false
-                    }
+                LaunchedEffect(Unit) {
+                    delay(1200)
+                    showSplash = false
+                }
 
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
-                    ) {
-                        if (showSplash) {
-                            Box(
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color(0xFFE8ECEF)
+                ) {
+                    if (showSplash) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.fond_kaptal_propre),
+                                contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.fond_kaptal_propre),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_k_logo),
-                                    contentDescription = "Logo Kaptal",
-                                    modifier = Modifier.size(160.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                            }
-                        } else {
-                            KaptalApp(activity = this@MainActivity)
+                                contentScale = ContentScale.Crop
+                            )
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_k_logo),
+                                contentDescription = "Logo Kaptal",
+                                modifier = Modifier.size(160.dp),
+                                contentScale = ContentScale.Fit
+                            )
                         }
+                    } else {
+                        KaptalApp(activity = this@MainActivity)
                     }
                 }
             }
@@ -201,10 +199,16 @@ fun KaptalApp(activity: FragmentActivity, viewModel: MainViewModel = viewModel()
             }
 
             composable("settings") {
+                val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                val allBalances = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accountBalances else emptyMap()
+
                 SettingsScreen(
                     onBackClick = {
                         navController.popBackStack()
-                    }
+                    },
+                    allAccounts = allAccounts,
+                    allBalances = allBalances
                 )
             }
 

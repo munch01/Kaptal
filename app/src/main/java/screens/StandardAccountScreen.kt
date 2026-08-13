@@ -1,4 +1,4 @@
-package com.example.kaptal.screens
+package com.Muncho.kaptal.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -32,12 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.kaptal.R
-import com.example.kaptal.MainViewModel
-import com.example.kaptal.model.Account
-import com.example.kaptal.model.Transaction
-import com.example.kaptal.viewmodel.AccountDetailViewModel
-import com.example.kaptal.viewmodel.RecurrenceEditScope
+import com.Muncho.kaptal.R
+import com.Muncho.kaptal.MainViewModel
+import com.Muncho.kaptal.model.Account
+import com.Muncho.kaptal.model.Transaction
+import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
+import com.Muncho.kaptal.viewmodel.RecurrenceEditScope
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -219,20 +219,20 @@ fun StandardAccountScreen(
                 }
             }
         }
-    }
 
-    if (showChartSheet) {
-        val currentMonthOffset = pagerState.currentPage - 120
-        val totalMonths = baseYear * 12 + baseMonth + currentMonthOffset
-        val dialogYear = totalMonths / 12
-        val dialogMonth = totalMonths % 12
+        if (showChartSheet) {
+            val currentMonthOffset = pagerState.currentPage - 120
+            val totalMonths = baseYear * 12 + baseMonth + currentMonthOffset
+            val dialogYear = totalMonths / 12
+            val dialogMonth = totalMonths % 12
 
-        CategoryDistributionDialog(
-            transactions = transactions,
-            year = dialogYear,
-            month = dialogMonth,
-            onDismiss = { showChartSheet = false }
-        )
+            CategoryDistributionDialog(
+                transactions = transactions,
+                year = dialogYear,
+                month = dialogMonth,
+                onDismiss = { showChartSheet = false }
+            )
+        }
     }
 
     showEditChoiceDialog?.let { (transaction, effectiveDate) ->
@@ -245,15 +245,6 @@ fun StandardAccountScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    TextButton(
-                        onClick = {
-                            showEditChoiceDialog = null
-                            transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(R.string.recurrence_all))
-                    }
                     TextButton(
                         onClick = {
                             showEditChoiceDialog = null

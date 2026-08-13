@@ -1,11 +1,11 @@
-package com.example.kaptal.ui.theme
+package com.Muncho.kaptal.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import com.example.kaptal.R
+import com.Muncho.kaptal.R
 
 val LexendFamily = FontFamily(
     Font(R.font.lexend_thin, FontWeight.Thin),

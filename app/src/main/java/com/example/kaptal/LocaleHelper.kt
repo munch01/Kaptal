@@ -1,4 +1,4 @@
-package com.example.kaptal
+package com.Muncho.kaptal
 
 import android.content.Context
 import android.content.res.Configuration

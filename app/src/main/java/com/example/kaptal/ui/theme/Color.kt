@@ -1,4 +1,4 @@
-package com.example.kaptal.ui.theme
+package com.Muncho.kaptal.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

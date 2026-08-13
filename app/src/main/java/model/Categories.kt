@@ -1,4 +1,4 @@
-package com.example.kaptal.model
+package com.Muncho.kaptal.model
 
 data class CategoryFamily(
     val name: String,

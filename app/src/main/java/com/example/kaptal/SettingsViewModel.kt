@@ -1,7 +1,9 @@
-package com.example.kaptal
+package com.Muncho.kaptal
 
 import android.app.Application
 import android.content.Context
+import com.Muncho.kaptal.model.Account
+import org.json.JSONObject
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -136,6 +138,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         currentUser?.delete()
             ?.addOnSuccessListener { onResult(true, "Compte supprimé avec succès.") }
             ?.addOnFailureListener { e -> onResult(false, e.localizedMessage ?: "Erreur") }
+    }
+
+    fun getExportDataJson(accounts: List<Account>, balances: Map<String, Double>): String {
+        val root = JSONObject()
+        val accountsArray = org.json.JSONArray()
+        accounts.forEach { acc ->
+            val obj = JSONObject()
+            obj.put("name", acc.name)
+            obj.put("bank", acc.bankName)
+            obj.put("balance", balances[acc.id] ?: acc.initialBalance)
+            obj.put("type", acc.type)
+            accountsArray.put(obj)
+        }
+        root.put("accounts", accountsArray)
+        root.put("exportDate", Timestamp.now().toDate().toString())
+        return root.toString(4)
+    }
+
+    fun getExportDataCsv(accounts: List<Account>, balances: Map<String, Double>): String {
+        val sb = StringBuilder()
+        sb.append("Nom du compte;Banque;Type;Solde actuel\n")
+        accounts.forEach { acc ->
+            val balance = balances[acc.id] ?: acc.initialBalance
+            sb.append("${acc.name};${acc.bankName};${acc.type};${String.format("%.2f", balance)}\n")
+        }
+        return sb.toString()
     }
 
     /**
