@@ -25,7 +25,7 @@ jobs:
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
 
       - name: Build Release Bundle
-        run: ./gradlew :app:bundleRelease
+        run: ./gradlew :app:bundleRelease -PversionCode=${{ github.run_number }} -PversionName="1.0.${{ github.run_number }}"
 
       - name: Sign App Bundle
         uses: r0adkll/sign-android-release@v1
