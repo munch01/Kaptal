@@ -11,13 +11,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.Muncho.kaptal.model.Account
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,12 +124,17 @@ fun HomeScreen(
                     },
                     actions = {
                         IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/issues")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:3lmunch0@gmail.com")
+                                putExtra(Intent.EXTRA_SUBJECT, "Support Kaptal")
                             }
-                            context.startActivity(intent)
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Aucune application d'e-mail trouvée", Toast.LENGTH_SHORT).show()
+                            }
                         }) {
-                            Icon(Icons.Default.Feedback, contentDescription = stringResource(R.string.home_bug_report))
+                            Icon(Icons.Default.Info, contentDescription = "Support Email", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
@@ -139,24 +145,6 @@ fun HomeScreen(
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
-            },
-            floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        val typeKey = when(pagerState.currentPage) {
-                            0 -> "CHECKING"
-                            1 -> "SAVINGS"
-                            2 -> "CREDIT"
-                            else -> "CRYPTO"
-                        }
-                        onNavigateToAddAccount(typeKey)
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(bottom = 90.dp)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_add))
-                }
             }
         ) { paddingValues ->
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -204,6 +192,7 @@ fun HomeScreen(
                                 ) {
                                     items(items = accountsList, key = { account: Account -> account.id }) { account ->
                                         val realBalance = state.accountBalances[account.id] ?: account.initialBalance
+                                        val remainingDebt = state.creditRemainingDebts[account.id] ?: 0.0
 
                                         val dismissState = rememberSwipeToDismissBoxState(
                                             confirmValueChange = { dismissValue ->
@@ -255,6 +244,7 @@ fun HomeScreen(
                                             AccountCard(
                                                 account = account,
                                                 currentBalance = realBalance,
+                                                remainingDebt = remainingDebt,
                                                 currency = selectedCurrency,
                                                 cryptoRates = cryptoRates,
                                                 onClick = { onAccountClick(account) },
@@ -318,65 +308,66 @@ fun HomeScreen(
                     }
                 }
 
-                // Barre de Navigation Flottante, Transparente et Mieux Proportionnée
+                // Barre de Navigation Flottante, Transparente et Tout-en-un
                 Surface(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 20.dp, start = 32.dp, end = 32.dp) // Plus compacte
-                        .widthIn(max = 400.dp) // Largeur maximale pour éviter l'effet "étiré"
+                        .padding(bottom = 16.dp, start = 20.dp, end = 20.dp)
                         .fillMaxWidth(),
                     shape = RoundedCornerShape(32.dp),
-                    color = Color.White.copy(alpha = 0.85f),
-                    tonalElevation = 6.dp,
-                    shadowElevation = 10.dp
+                    color = Color.White.copy(alpha = 0.88f),
+                    shadowElevation = 12.dp
                 ) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        modifier = Modifier.height(64.dp), // Hauteur réduite
-                        windowInsets = WindowInsets(0, 0, 0, 0)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val tabs = listOf(
-                            Triple(0, Icons.Default.AccountBalance, R.string.account_type_checking),
-                            Triple(1, Icons.Default.Savings, R.string.account_type_savings),
-                            Triple(2, Icons.Default.CreditCard, R.string.account_type_credit),
-                            Triple(3, Icons.Default.CurrencyBitcoin, R.string.account_type_crypto)
-                        )
-                        
-                        tabs.forEach { (index, icon, labelRes) ->
-                            val isSelected = pagerState.currentPage == index
-                            NavigationBarItem(
-                                selected = isSelected,
-                                onClick = { 
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
+                        // 1. Onglets de gauche (Comptes, Épargne)
+                        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            NavTabItem(0, Icons.Default.AccountBalance, R.string.account_type_checking, pagerState.currentPage) { 
+                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                            }
+                            NavTabItem(1, Icons.Default.Savings, R.string.account_type_savings, pagerState.currentPage) { 
+                                coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                            }
+                        }
+
+                        // 2. Bouton CENTRAL D'AJOUT (+)
+                        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                            FilledIconButton(
+                                onClick = {
+                                    val typeKey = when(pagerState.currentPage) {
+                                        0 -> "CHECKING"
+                                        1 -> "SAVINGS"
+                                        2 -> "CREDIT"
+                                        else -> "CRYPTO"
                                     }
+                                    onNavigateToAddAccount(typeKey)
                                 },
-                                icon = { 
-                                    Icon(
-                                        icon, 
-                                        contentDescription = null, 
-                                        modifier = Modifier.size(if (isSelected) 26.dp else 22.dp),
-                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
-                                    ) 
-                                },
-                                label = { 
-                                    Text(
-                                        stringResource(labelRes), 
-                                        maxLines = 1, 
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
-                                    ) 
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = Color.Transparent
-                                )
-                            )
+                                modifier = Modifier.size(56.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(32.dp))
+                            }
+                        }
+
+                        // 3. Onglets de droite (Crédit, Crypto)
+                        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            NavTabItem(2, Icons.Default.CreditCard, R.string.account_type_credit, pagerState.currentPage) { 
+                                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                            }
+                            NavTabItem(3, Icons.Default.CurrencyBitcoin, R.string.account_type_crypto, pagerState.currentPage) { 
+                                coroutineScope.launch { pagerState.animateScrollToPage(3) }
+                            }
                         }
                     }
                 }
 
-                // Bouton Café
+                // Bouton Café Flottant discret
                 Surface(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -388,12 +379,13 @@ fun HomeScreen(
                             context.startActivity(intent)
                         },
                     shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                    color = Color.White.copy(alpha = 0.7f),
                     shadowElevation = 4.dp
                 ) {
-                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("☕", style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.home_kofi), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("☕", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Café", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -437,9 +429,27 @@ fun HomeScreen(
 }
 
 @Composable
+private fun NavTabItem(index: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, labelRes: Int, currentPage: Int, onClick: () -> Unit) {
+    val isSelected = index == currentPage
+    val color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
+    
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = color)
+        Text(stringResource(labelRes), fontSize = 9.sp, color = color, maxLines = 1)
+    }
+}
+
+@Composable
 fun AccountCard(
     account: Account,
     currentBalance: Double,
+    remainingDebt: Double = 0.0,
     currency: String,
     cryptoRates: Map<String, Double>,
     onClick: () -> Unit,
@@ -513,9 +523,9 @@ fun AccountCard(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline
                     )
-                    val remainingDebt = (account.totalAmount ?: 0.0) - currentBalance
+                    
                     Text(
-                        text = String.format(Locale.US, "%.2f %s", remainingDebt, currency),
+                        text = String.format(Locale.US, "%.2f %s", if (remainingDebt > 0) remainingDebt else 0.0, currency),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error

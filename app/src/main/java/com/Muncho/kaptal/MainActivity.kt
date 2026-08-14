@@ -47,15 +47,23 @@ class MainActivity : FragmentActivity() {
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
-        super.attachBaseContext(LocaleHelper.setLocale(newBase, lang))
+        // On applique la locale au niveau du système de manière plus robuste
+        val locale = when (lang) {
+            "English" -> Locale.ENGLISH
+            "Español" -> Locale("es")
+            else -> Locale.FRENCH
+        }
+        Locale.setDefault(locale)
+        val config = newBase.resources.configuration
+        config.setLocale(locale)
+        val context = newBase.createConfigurationContext(config)
+        super.attachBaseContext(context)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Initialisation de la lecture PDF
         PDFBoxResourceLoader.init(this)
-        
         appUpdateManager = AppUpdateManagerFactory.create(this)
         checkForUpdates()
 
@@ -64,38 +72,27 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             CompositionLocalProvider(LocalActivity provides this@MainActivity) {
-                KaptalTheme {
-                    var showSplash by remember { mutableStateOf(true) }
+                val context = LocalContext.current
+                val localeContext = remember(lang) { LocaleHelper.setLocale(context, lang) }
+                
+                CompositionLocalProvider(LocalContext provides localeContext) {
+                    KaptalTheme {
+                        var showSplash by remember { mutableStateOf(true) }
 
-                    LaunchedEffect(Unit) {
-                        delay(1200)
-                        showSplash = false
-                    }
+                        LaunchedEffect(Unit) {
+                            delay(1200)
+                            showSplash = false
+                        }
 
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = Color(0xFFE8ECEF)
-                    ) {
-                        if (showSplash) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.fond_kaptal_propre),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_k_logo),
-                                    contentDescription = "Logo Kaptal",
-                                    modifier = Modifier.size(160.dp),
-                                    contentScale = ContentScale.Fit
-                                )
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = Color(0xFFE8ECEF)
+                        ) {
+                            if (showSplash) {
+                                SplashContent()
+                            } else {
+                                KaptalApp(activity = this@MainActivity)
                             }
-                        } else {
-                            KaptalApp(activity = this@MainActivity)
                         }
                     }
                 }
@@ -130,6 +127,27 @@ class MainActivity : FragmentActivity() {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun SplashContent() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.fond_kaptal_propre),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Image(
+            painter = painterResource(id = R.drawable.ic_k_logo),
+            contentDescription = "Logo Kaptal",
+            modifier = Modifier.size(160.dp),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
@@ -185,7 +203,6 @@ fun KaptalApp(
             }
 
             composable("home") {
-                val context = LocalContext.current
                 HomeScreen(
                     viewModel = viewModel,
                     onNavigateToSettings = {
@@ -230,6 +247,7 @@ fun KaptalApp(
                             if (isJoint && !memberEmail.isNullOrBlank()) {
                                 viewModel.addMemberToAccount(accountId, memberEmail) { _, _ -> }
                             }
+                            // Pour les crédits, on reste sur l'accueil ou on pourra naviguer plus tard
                         }
                         navController.popBackStack()
                     }
@@ -282,7 +300,6 @@ fun KaptalApp(
                 val selectedAcc by viewModel.selectedAccount.collectAsState()
                 val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
                 
-                // On récupère la version la plus fraîche du compte
                 val currentAccount = allAccounts.find { it.id == selectedAcc?.id } ?: selectedAcc
 
                 currentAccount?.let {

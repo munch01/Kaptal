@@ -1,5 +1,8 @@
 package com.Muncho.kaptal.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -13,11 +16,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,6 +59,8 @@ fun StandardAccountScreen(
     var transactionToEdit by remember { mutableStateOf<Pair<Transaction, Pair<Timestamp?, RecurrenceEditScope>>?>(null) }
     var transactionToDelete by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
     var showEditChoiceDialog by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(account.id) {
         detailViewModel.loadTransactions(account.id)
@@ -127,10 +127,20 @@ fun StandardAccountScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { showChartSheet = true }) {
+                        IconButton(onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:3lmunch0@gmail.com")
+                                putExtra(Intent.EXTRA_SUBJECT, "Support Kaptal - ${account.name}")
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Aucune application d'e-mail trouvée", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = stringResource(R.string.account_detail_chart),
+                                imageVector = Icons.Default.AlternateEmail,
+                                contentDescription = "Support Email",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

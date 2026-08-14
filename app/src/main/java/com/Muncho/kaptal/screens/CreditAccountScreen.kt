@@ -48,6 +48,7 @@ fun CreditAccountScreen(
     var showSetupDialog by remember { mutableStateOf(false) }
     
     val importStatus by detailViewModel.importStatus.collectAsState()
+    val transactions by detailViewModel.transactions.collectAsState()
 
     LaunchedEffect(account.id) {
         detailViewModel.loadTransactions(account.id)
@@ -196,13 +197,12 @@ fun CreditAccountScreen(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 // Liste des mensualités (Échéancier)
-                val transactions by detailViewModel.transactions.collectAsState()
                 // Échéancier : Tri chronologique (croissant) par la date complète
                 val sortedTxs = transactions.sortedBy { it.date }
 
                 if (sortedTxs.isEmpty()) {
                     Text(
-                        text = "Aucune mensualité importée. Utilisez le bouton ci-dessus pour lire votre tableau d'amortissement.",
+                        text = "Aucune mensualité importée. Utilisez le bouton + sur la fiche de prêt pour configurer votre crédit.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -269,13 +269,27 @@ fun CreditAccountScreen(
     }
 
     if (showSetupDialog) {
-        var firstInstallmentDate by remember { mutableStateOf(Date()) }
+        // Pré-remplissage avec les données actuelles
+        var firstInstallmentDate by remember { 
+            mutableStateOf(
+                if (account.loanStartDate != null) 
+                    SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).parse(account.loanStartDate) ?: Date()
+                else Date()
+            ) 
+        }
         var monthlyPayment by remember { mutableStateOf(account.loanMonthlyPayment?.toString() ?: "") }
-        var durationMonths by remember { mutableStateOf("") }
+        var durationMonths by remember { mutableStateOf(if (transactions.isNotEmpty()) transactions.size.toString() else "") }
         var insurance by remember { mutableStateOf(account.loanInsurance?.toString() ?: "") }
         var rate by remember { mutableStateOf(account.loanRate?.toString() ?: "") }
         var totalCapital by remember { mutableStateOf(account.totalAmount?.toString() ?: "") }
-        var withdrawalDay by remember { mutableStateOf("5") } // Jour par défaut
+        var withdrawalDay by remember { 
+            mutableStateOf(
+                if (transactions.isNotEmpty()) {
+                    val cal = Calendar.getInstance().apply { time = transactions.first().date.toDate() }
+                    cal.get(Calendar.DAY_OF_MONTH).toString()
+                } else "5"
+            )
+        }
         
         val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
 

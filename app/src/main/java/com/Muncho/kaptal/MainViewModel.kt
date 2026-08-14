@@ -29,7 +29,8 @@ sealed interface AccountsUiState {
     object Loading : AccountsUiState
     data class Success(
         val accounts: List<Account>,
-        val accountBalances: Map<String, Double> = emptyMap() // Map: accountId -> soldeRéelActuel
+        val accountBalances: Map<String, Double> = emptyMap(), // Map: accountId -> soldeRéelActuel
+        val creditRemainingDebts: Map<String, Double> = emptyMap() // Map: accountId -> capitalRestantDû
     ) : AccountsUiState
     data class Error(val message: String) : AccountsUiState
 }
@@ -311,7 +312,20 @@ class MainViewModel : ViewModel() {
             val txs = accountTransactionsMap[account.id] ?: emptyList()
             account.id to calculateCurrentRealBalance(account, txs)
         }
-        _uiState.value = AccountsUiState.Success(accounts, balancesMap)
+        
+        val debtsMap = accounts.filter { it.type == "CREDIT" }.associate { account ->
+            val txs = accountTransactionsMap[account.id] ?: emptyList()
+            val totalCapital = account.totalAmount ?: 0.0
+            
+            // On somme tous les remboursements (INCOME) dont la date est passée ou aujourd'hui
+            val now = Calendar.getInstance().timeInMillis
+            val paidAmount = txs.filter { it.type == "INCOME" && it.date.toDate().time <= now }
+                               .sumOf { it.amount }
+            
+            account.id to (totalCapital - paidAmount)
+        }
+
+        _uiState.value = AccountsUiState.Success(accounts, balancesMap, debtsMap)
     }
 
     private fun calculateCurrentRealBalance(account: Account, transactions: List<Transaction>): Double {

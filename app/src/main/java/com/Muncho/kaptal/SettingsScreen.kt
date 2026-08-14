@@ -245,7 +245,7 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_password_subtitle),
                         onClick = {
                             viewModel.sendPasswordResetEmail { success, message ->
-                                Toast.makeText(context, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+                                Toast.makeText(activity, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
@@ -309,7 +309,7 @@ fun SettingsScreen(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal")).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(intent)
+                            activity.startActivity(intent)
                         }
                     )
 
@@ -324,7 +324,7 @@ fun SettingsScreen(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE")).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(intent)
+                            activity.startActivity(intent)
                         }
                     )
 
@@ -339,7 +339,7 @@ fun SettingsScreen(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://munch01.github.io/Kaptal/index.md")).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(intent)
+                            activity.startActivity(intent)
                         }
                     )
 
@@ -348,7 +348,7 @@ fun SettingsScreen(
                     SettingsClickableItem(
                         icon = Icons.Default.Info,
                         title = stringResource(R.string.settings_about_title),
-                        subtitle = stringResource(R.string.settings_version, "1.0.0"),
+                        subtitle = stringResource(R.string.settings_version, "1.0.120"),
                         onClick = { showAboutDialog = true }
                     )
                 }
@@ -509,7 +509,7 @@ fun SettingsScreen(
                     enabled = newEmailText.isNotBlank(),
                     onClick = {
                         viewModel.updateEmail(newEmailText) { _, msg ->
-                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
                             showEmailDialog = false
                         }
                     }
@@ -528,7 +528,7 @@ fun SettingsScreen(
                 Column {
                     Text(stringResource(R.string.settings_about_description))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(stringResource(R.string.settings_version, "1.0.0"), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_version, "1.0.120"), fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.settings_about_tech))
                 }
             },
@@ -546,7 +546,7 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     onClick = {
                         viewModel.deleteAccount { success, msg ->
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show()
                             showDeleteAccountDialog = false
                             if (success) onBackClick()
                         }
