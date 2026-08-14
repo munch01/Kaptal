@@ -32,7 +32,12 @@ data class Transaction(
 
     // --- VIREMENTS ENTRE COMPTES ---
     val transferGroupId: String? = null,    // Identifiant unique pour lier les deux côtés du virement
-    val targetAccountId: String? = null     // ID du compte de l'autre côté du virement
+    val targetAccountId: String? = null,     // ID du compte de l'autre côté du virement
+
+    // --- DÉTAILS CRÉDIT ---
+    val principalPart: Double? = null,      // Part de capital remboursé
+    val interestPart: Double? = null,       // Part d'intérêts payés
+    val insurancePart: Double? = null       // Part d'assurance payée
 ) {
     /**
      * Vérifie si l'opération est pointée pour un mois donné (ex: "2026-08")

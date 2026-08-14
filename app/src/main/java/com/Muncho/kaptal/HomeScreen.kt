@@ -1,6 +1,5 @@
 package com.Muncho.kaptal
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -8,13 +7,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +46,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     onNavigateToSettings: () -> Unit = {},
+    onNavigateToAddAccount: (String) -> Unit = {},
     onAccountClick: (Account) -> Unit = {},
     onExit: () -> Unit = {},
     viewModel: MainViewModel = viewModel()
@@ -50,13 +54,18 @@ fun HomeScreen(
     val activity = LocalActivity.current
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    
     val uiState by viewModel.uiState.collectAsState()
     val selectedCurrency by viewModel.appCurrency.collectAsState()
     val cryptoRates by viewModel.cryptoRates.collectAsState()
 
-    var showAddDialog by remember { mutableStateOf(false) }
+    val pagerState = rememberPagerState(pageCount = { 4 })
+    val coroutineScope = rememberCoroutineScope()
+
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
     var accountToDelete by remember { mutableStateOf<Account?>(null) }
+    
+    var draggingAccountId by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -93,8 +102,14 @@ fun HomeScreen(
             topBar = {
                 TopAppBar(
                     title = {
+                        val titleRes = when(pagerState.currentPage) {
+                            0 -> R.string.home_title
+                            1 -> R.string.account_type_savings
+                            2 -> R.string.account_type_credit
+                            else -> R.string.account_type_crypto
+                        }
                         Text(
-                            stringResource(R.string.home_title),
+                            stringResource(titleRes),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold
@@ -102,7 +117,7 @@ fun HomeScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onExit) {
+                        IconButton(onClick = { activity.finish() }) {
                             Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = stringResource(R.string.home_quit))
                         }
                     },
@@ -125,191 +140,277 @@ fun HomeScreen(
                     )
                 )
             },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_add))
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        val typeKey = when(pagerState.currentPage) {
+                            0 -> "CHECKING"
+                            1 -> "SAVINGS"
+                            2 -> "CREDIT"
+                            else -> "CRYPTO"
+                        }
+                        onNavigateToAddAccount(typeKey)
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(bottom = 90.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.home_add))
+                }
             }
-        }
-    ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            when (val state = uiState) {
-                is AccountsUiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                is AccountsUiState.Error -> {
-                    Column(modifier = Modifier.align(Alignment.Center).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = state.message, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = { viewModel.loadAccounts() }) { Text(stringResource(R.string.home_retry)) }
+        ) { paddingValues ->
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                when (val state = uiState) {
+                    is AccountsUiState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
-                }
-                is AccountsUiState.Success -> {
-                    if (state.accounts.isEmpty()) {
-                        Column(modifier = Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(stringResource(R.string.home_no_accounts), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline)
+                    is AccountsUiState.Error -> {
+                        Column(modifier = Modifier.align(Alignment.Center).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = state.message, color = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = { viewModel.loadAccounts() }) { Text(stringResource(R.string.home_retry)) }
                         }
-                    } else {
-                        var accountsList by remember(state.accounts) {
-                            mutableStateOf(state.accounts.sortedBy { it.order })
-                        }
-                        val listState = rememberLazyListState()
+                    }
+                    is AccountsUiState.Success -> {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize()
+                        ) { pageIndex ->
+                            val filteredAccounts = remember(state.accounts, pageIndex) {
+                                when (pageIndex) {
+                                    0 -> state.accounts.filter { it.type == "CHECKING" }
+                                    1 -> state.accounts.filter { it.type == "SAVINGS" || it.type == "LIVRET_A" }
+                                    2 -> state.accounts.filter { it.type == "CREDIT" }
+                                    else -> state.accounts.filter { it.type == "CRYPTO" }
+                                }
+                            }
 
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp)
-                        ) {
-                            items(items = accountsList, key = { account: Account -> account.id }) { account ->
-                                val realBalance = state.accountBalances[account.id] ?: account.initialBalance
+                            if (filteredAccounts.isEmpty()) {
+                                Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                    Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(stringResource(R.string.home_no_accounts), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline)
+                                }
+                            } else {
+                                var accountsList by remember(filteredAccounts) {
+                                    mutableStateOf(filteredAccounts.sortedBy { it.order })
+                                }
+                                val listState = rememberLazyListState()
 
-                                val dismissState = rememberSwipeToDismissBoxState(
-                                    confirmValueChange = { dismissValue ->
-                                        when (dismissValue) {
-                                            SwipeToDismissBoxValue.StartToEnd -> {
-                                                accountToEdit = account
-                                                false
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp)
+                                ) {
+                                    items(items = accountsList, key = { account: Account -> account.id }) { account ->
+                                        val realBalance = state.accountBalances[account.id] ?: account.initialBalance
+
+                                        val dismissState = rememberSwipeToDismissBoxState(
+                                            confirmValueChange = { dismissValue ->
+                                                when (dismissValue) {
+                                                    SwipeToDismissBoxValue.StartToEnd -> {
+                                                        accountToEdit = account
+                                                        false
+                                                    }
+                                                    SwipeToDismissBoxValue.EndToStart -> {
+                                                        accountToDelete = account
+                                                        false
+                                                    }
+                                                    SwipeToDismissBoxValue.Settled -> false
+                                                }
                                             }
-                                            SwipeToDismissBoxValue.EndToStart -> {
-                                                accountToDelete = account
-                                                false
+                                        )
+
+                                        SwipeToDismissBox(
+                                            state = dismissState,
+                                            backgroundContent = {
+                                                val direction = dismissState.dismissDirection
+                                                val alignment = when (direction) {
+                                                    SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                                                    else -> Alignment.CenterEnd
+                                                }
+                                                val icon = when (direction) {
+                                                    SwipeToDismissBoxValue.StartToEnd -> Icons.Default.Edit
+                                                    else -> Icons.Default.Delete
+                                                }
+                                                val tint = when (direction) {
+                                                    SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                    else -> MaterialTheme.colorScheme.onErrorContainer
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(horizontal = 16.dp),
+                                                    contentAlignment = alignment
+                                                ) {
+                                                    Icon(
+                                                        imageVector = icon,
+                                                        contentDescription = null,
+                                                        tint = tint
+                                                    )
+                                                }
                                             }
-                                            SwipeToDismissBoxValue.Settled -> false
-                                        }
-                                    }
-                                )
-
-                                SwipeToDismissBox(
-                                    state = dismissState,
-                                    backgroundContent = {
-                                        val direction = dismissState.dismissDirection
-                                        val alignment = when (direction) {
-                                            SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-                                            else -> Alignment.CenterEnd
-                                        }
-                                        val icon = when (direction) {
-                                            SwipeToDismissBoxValue.StartToEnd -> Icons.Default.Edit
-                                            else -> Icons.Default.Delete
-                                        }
-                                        val tint = when (direction) {
-                                            SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
-                                            else -> MaterialTheme.colorScheme.onErrorContainer
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(horizontal = 16.dp),
-                                            contentAlignment = alignment
                                         ) {
-                                            Icon(
-                                                imageVector = icon,
-                                                contentDescription = null,
-                                                tint = tint
+                                            AccountCard(
+                                                account = account,
+                                                currentBalance = realBalance,
+                                                currency = selectedCurrency,
+                                                cryptoRates = cryptoRates,
+                                                onClick = { onAccountClick(account) },
+                                                modifier = Modifier
+                                                    .animateItem()
+                                                    .graphicsLayer {
+                                                        if (draggingAccountId == account.id) {
+                                                            scaleX = 1.05f
+                                                            scaleY = 1.05f
+                                                            alpha = 0.9f
+                                                        }
+                                                    }
+                                                    .pointerInput(accountsList) {
+                                                        var verticalOffset = 0f
+                                                        detectDragGesturesAfterLongPress(
+                                                            onDragStart = { 
+                                                                draggingAccountId = account.id
+                                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            },
+                                                            onDragEnd = { 
+                                                                draggingAccountId = null
+                                                                viewModel.updateAccountsOrder(accountsList) 
+                                                            },
+                                                            onDragCancel = { 
+                                                                draggingAccountId = null
+                                                                viewModel.updateAccountsOrder(accountsList) 
+                                                            },
+                                                            onDrag = { change, dragAmount ->
+                                                                change.consume()
+                                                                verticalOffset += dragAmount.y
+                                                                val threshold = 180f 
+                                                                
+                                                                if (verticalOffset > threshold) {
+                                                                    val currentIndex = accountsList.indexOf(account)
+                                                                    if (currentIndex < accountsList.size - 1) {
+                                                                        accountsList = accountsList.toMutableList().apply {
+                                                                            add(currentIndex + 1, removeAt(currentIndex))
+                                                                        }
+                                                                        verticalOffset = 0f
+                                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                                    }
+                                                                } else if (verticalOffset < -threshold) {
+                                                                    val currentIndex = accountsList.indexOf(account)
+                                                                    if (currentIndex > 0) {
+                                                                        accountsList = accountsList.toMutableList().apply {
+                                                                            add(currentIndex - 1, removeAt(currentIndex))
+                                                                        }
+                                                                        verticalOffset = 0f
+                                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                                    }
+                                                                }
+                                                            }
+                                                        )
+                                                    }
                                             )
                                         }
                                     }
-                                ) {
-                                    AccountCard(
-                                        account = account,
-                                        currentBalance = realBalance,
-                                        currency = selectedCurrency,
-                                        cryptoRates = cryptoRates,
-                                        onClick = { onAccountClick(account) },
-                                        modifier = Modifier
-                                            .animateItem()
-                                            .pointerInput(accountsList) {
-                                                detectDragGesturesAfterLongPress(
-                                                    onDragStart = { 
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    },
-                                                    onDragEnd = { viewModel.updateAccountsOrder(accountsList) },
-                                                    onDragCancel = { viewModel.updateAccountsOrder(accountsList) },
-                                                    onDrag = { change, dragAmount ->
-                                                        change.consume()
-                                                        // Ajout d'une sensibilité (threshold) pour éviter les sauts involontaires
-                                                        if (kotlin.math.abs(dragAmount.y) > 5f) {
-                                                            val currentIndex = accountsList.indexOf(account)
-                                                            val targetIndex = (currentIndex + if (dragAmount.y > 0) 1 else -1)
-                                                                .coerceIn(0, accountsList.size - 1)
-                                                            
-                                                            if (currentIndex != targetIndex) {
-                                                                accountsList = accountsList.toMutableList().apply {
-                                                                    add(targetIndex, removeAt(currentIndex))
-                                                                }
-                                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                            }
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                    )
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Bouton Café
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
-                    .clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho")).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                // Barre de Navigation Flottante, Transparente et Mieux Proportionnée
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp, start = 32.dp, end = 32.dp) // Plus compacte
+                        .widthIn(max = 400.dp) // Largeur maximale pour éviter l'effet "étiré"
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(32.dp),
+                    color = Color.White.copy(alpha = 0.85f),
+                    tonalElevation = 6.dp,
+                    shadowElevation = 10.dp
+                ) {
+                    NavigationBar(
+                        containerColor = Color.Transparent,
+                        modifier = Modifier.height(64.dp), // Hauteur réduite
+                        windowInsets = WindowInsets(0, 0, 0, 0)
+                    ) {
+                        val tabs = listOf(
+                            Triple(0, Icons.Default.AccountBalance, R.string.account_type_checking),
+                            Triple(1, Icons.Default.Savings, R.string.account_type_savings),
+                            Triple(2, Icons.Default.CreditCard, R.string.account_type_credit),
+                            Triple(3, Icons.Default.CurrencyBitcoin, R.string.account_type_crypto)
+                        )
+                        
+                        tabs.forEach { (index, icon, labelRes) ->
+                            val isSelected = pagerState.currentPage == index
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = { 
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                                icon = { 
+                                    Icon(
+                                        icon, 
+                                        contentDescription = null, 
+                                        modifier = Modifier.size(if (isSelected) 26.dp else 22.dp),
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                                    ) 
+                                },
+                                label = { 
+                                    Text(
+                                        stringResource(labelRes), 
+                                        maxLines = 1, 
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                                    ) 
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = Color.Transparent
+                                )
+                            )
                         }
-                        context.startActivity(intent)
-                    },
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shadowElevation = 4.dp
-            ) {
-                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("☕", style = MaterialTheme.typography.bodyLarge)
-                    Text(stringResource(R.string.home_kofi), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                // Bouton Café
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = 100.dp, start = 20.dp) 
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        },
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                    shadowElevation = 4.dp
+                ) {
+                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("☕", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.home_kofi), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
     }
 
-    if (showAddDialog) {
-        val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
-        AccountFormDialog(
-            title = stringResource(R.string.account_add_title),
-            initialAccount = null,
-            allAccounts = allAccounts,
-            onDismiss = { showAddDialog = false },
-            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, _, linkedAccountId ->
-                viewModel.addAccount(name, bankName, initialBalance, type, isJoint, color, linkedAccountId) { newAccountId ->
-                    if (isJoint && memberEmail.isNotBlank()) {
-                        viewModel.addMemberToAccount(newAccountId, memberEmail) { _, message ->
-                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    showAddDialog = false
-                }
-            }
-        )
-    }
-
-    accountToEdit?.let { account ->
+    if (accountToEdit != null) {
         val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
         AccountFormDialog(
             title = stringResource(R.string.account_edit_title),
-            initialAccount = account,
+            initialAccount = accountToEdit,
             allAccounts = allAccounts,
             onDismiss = { accountToEdit = null },
             onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, _, linkedAccountId ->
-                viewModel.updateAccount(account.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId) {
+                viewModel.updateAccount(accountToEdit!!.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId) {
                     if (isJoint && memberEmail.isNotBlank()) {
-                        viewModel.addMemberToAccount(account.id, memberEmail) { _, message ->
+                        viewModel.addMemberToAccount(accountToEdit!!.id, memberEmail) { _, message ->
                             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -333,7 +434,6 @@ fun HomeScreen(
             dismissButton = { TextButton(onClick = { accountToDelete = null }) { Text(stringResource(R.string.cancel_label)) } }
         )
     }
-}
 }
 
 @Composable
@@ -391,7 +491,7 @@ fun AccountCard(
 
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
                 if (account.type == "CRYPTO") {
-                    val cryptoSymbol = "BTC" // Peut être rendu dynamique si stocké dans l'objet Account
+                    val cryptoSymbol = "BTC" 
                     Text(
                         text = String.format(Locale.US, "%.4f %s", currentBalance, cryptoSymbol),
                         style = MaterialTheme.typography.titleMedium,
@@ -399,7 +499,6 @@ fun AccountCard(
                         color = balanceColor
                     )
 
-                    // Calcul de la conversion avec le taux récupéré en direct
                     val rate = cryptoRates[cryptoSymbol] ?: 0.0
                     val estimatedEuro = currentBalance * rate
 
@@ -407,6 +506,19 @@ fun AccountCard(
                         text = String.format(Locale.US, "≈ %.2f %s", estimatedEuro, currency),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
+                    )
+                } else if (account.type == "CREDIT") {
+                    Text(
+                        text = "Capital restant dû",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    val remainingDebt = (account.totalAmount ?: 0.0) - currentBalance
+                    Text(
+                        text = String.format(Locale.US, "%.2f %s", remainingDebt, currency),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
                     )
                 } else {
                     Text(
@@ -434,7 +546,6 @@ fun AccountFormDialog(
     var bankName by remember { mutableStateOf(initialAccount?.bankName ?: "") }
     var initialBalanceText by remember { mutableStateOf(initialAccount?.initialBalance?.toString() ?: "") }
     var selectedType by remember { mutableStateOf(initialAccount?.type ?: "CHECKING") }
-    var selectedCryptoSymbol by remember { mutableStateOf("BTC") }
     var linkedAccountId by remember { mutableStateOf(initialAccount?.linkedAccountId) }
     var expandedLinkedAccount by remember { mutableStateOf(false) }
 
@@ -443,7 +554,6 @@ fun AccountFormDialog(
     var memberEmail by remember { mutableStateOf("") }
 
     val availableColors = listOf("#2196F3", "#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#00BCD4")
-    val supportedCryptos = listOf("BTC" to "Bitcoin", "ETH" to "Ethereum", "SOL" to "Solana", "USDT" to "USDT", "ADA" to "Cardano", "XRP" to "XRP")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -456,43 +566,7 @@ fun AccountFormDialog(
                 OutlinedTextField(value = accountName, onValueChange = { accountName = it }, label = { Text(stringResource(R.string.account_name_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = bankName, onValueChange = { bankName = it }, label = { Text(stringResource(R.string.account_bank_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
-                Text(stringResource(R.string.account_type_label), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                val accountTypes = listOf(
-                    "CHECKING" to stringResource(R.string.account_type_checking),
-                    "SAVINGS" to stringResource(R.string.account_type_savings),
-                    "LIVRET_A" to stringResource(R.string.account_type_livret_a),
-                    "CREDIT" to stringResource(R.string.account_type_credit),
-                    "CRYPTO" to stringResource(R.string.account_type_crypto),
-                    "CASH" to stringResource(R.string.account_type_cash)
-                )
-                accountTypes.chunked(3).forEach { rowTypes ->
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowTypes.forEach { (typeKey, typeLabel) ->
-                            FilterChip(
-                                modifier = Modifier.weight(1f),
-                                selected = selectedType == typeKey,
-                                onClick = { selectedType = typeKey },
-                                label = { Text(typeLabel, maxLines = 1) }
-                            )
-                        }
-                    }
-                }
-
-                if (selectedType == "CRYPTO") {
-                    Text(stringResource(R.string.account_crypto_asset), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        supportedCryptos.chunked(3).forEach { rowItems ->
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                rowItems.forEach { (symbol, label) ->
-                                    FilterChip(modifier = Modifier.weight(1f), selected = selectedCryptoSymbol == symbol, onClick = { selectedCryptoSymbol = symbol }, label = { Text(label, maxLines = 1) })
-                                }
-                            }
-                        }
-                    }
-                }
-
                 if (selectedType == "CREDIT") {
-                    Text(stringResource(R.string.tx_source_account_label), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     ExposedDropdownMenuBox(
                         expanded = expandedLinkedAccount,
                         onExpandedChange = { expandedLinkedAccount = !expandedLinkedAccount }
@@ -502,10 +576,9 @@ fun AccountFormDialog(
                             value = selectedAcc?.name ?: "",
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Sélectionner un compte") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
+                            label = { Text(stringResource(R.string.tx_source_account_label)) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedLinkedAccount) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
                         )
                         ExposedDropdownMenu(
                             expanded = expandedLinkedAccount,
@@ -524,14 +597,16 @@ fun AccountFormDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = initialBalanceText,
-                    onValueChange = { initialBalanceText = it },
-                    label = { Text(if (selectedType == "CRYPTO") stringResource(R.string.account_crypto_quantity, selectedCryptoSymbol) else stringResource(R.string.account_initial_balance)) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (selectedType != "CREDIT") {
+                    OutlinedTextField(
+                        value = initialBalanceText,
+                        onValueChange = { initialBalanceText = it },
+                        label = { Text(stringResource(R.string.account_initial_balance)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 Text(stringResource(R.string.account_color), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -543,7 +618,6 @@ fun AccountFormDialog(
 
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isJoint, onCheckedChange = { isJoint = it })
-                    Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.account_shared_checkbox))
                 }
 
@@ -561,11 +635,10 @@ fun AccountFormDialog(
         },
         confirmButton = {
             Button(
-                enabled = accountName.isNotBlank() && initialBalanceText.toDoubleOrNull() != null,
+                enabled = accountName.isNotBlank() && (selectedType == "CREDIT" || initialBalanceText.toDoubleOrNull() != null),
                 onClick = {
                     val initialBalance = initialBalanceText.toDoubleOrNull() ?: 0.0
-                    val finalCryptoSymbol = if (selectedType == "CRYPTO") selectedCryptoSymbol else null
-                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim(), finalCryptoSymbol, linkedAccountId)
+                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim(), null, linkedAccountId)
                 }
             ) { Text(stringResource(R.string.account_save)) }
         },

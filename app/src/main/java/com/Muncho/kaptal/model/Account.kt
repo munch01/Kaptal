@@ -11,5 +11,16 @@ data class Account(
     val order: Int = 0,
     val members: List<String> = emptyList(),
     val ownerId: String = "",
-    val linkedAccountId: String? = null
+    val linkedAccountId: String? = null,
+    
+    // --- MÉTADONNÉES CRÉDIT (Extraites du PDF) ---
+    val loanNumber: String? = null,
+    val insuranceRate: Double? = null,
+    val loanStartDate: String? = null,
+    val loanEndDate: String? = null,
+    val totalAmount: Double? = null,
+    val loanSigningDate: String? = null,
+    val loanMonthlyPayment: Double? = null,
+    val loanRate: Double? = null,
+    val loanInsurance: Double? = null
 )

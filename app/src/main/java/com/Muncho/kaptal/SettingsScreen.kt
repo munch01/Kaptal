@@ -336,7 +336,7 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_privacy_subtitle),
                         trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/PRIVACY.md")).apply {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://munch01.github.io/Kaptal/index.md")).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             context.startActivity(intent)

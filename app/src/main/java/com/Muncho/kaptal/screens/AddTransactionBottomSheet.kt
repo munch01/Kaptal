@@ -81,7 +81,7 @@ fun AddTransactionBottomSheet(
     val context = LocalContext.current
     val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRENCH)
 
-    var selectedDate by remember {
+    var selectedDate by remember(initialTransaction) {
         mutableStateOf(initialTransaction?.date?.toDate() ?: Date())
     }
 
@@ -93,7 +93,39 @@ fun AddTransactionBottomSheet(
         mutableStateOf<Date?>(initialTransaction?.endDate?.toDate())
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    var showExitConfirmation by remember { mutableStateOf(false) }
+    val isDirty = title.isNotBlank() || (amountText.isNotBlank() && amountText != "0" && amountText != "0.0")
+
+    if (showExitConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmation = false },
+            title = { Text("Abandonner ?") },
+            text = { Text("Voulez-vous vraiment annuler la saisie de cette opération ?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitConfirmation = false
+                    onDismiss()
+                }) {
+                    Text("Oui, abandonner", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirmation = false }) {
+                    Text("Continuer la saisie")
+                }
+            }
+        )
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = {
+            if (isDirty && initialTransaction == null) {
+                showExitConfirmation = true
+            } else {
+                onDismiss()
+            }
+        }
+    ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()

@@ -1,8 +1,12 @@
 package com.Muncho.kaptal.viewmodel
 
+import com.Muncho.kaptal.utils.AmortizationParser
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.Muncho.kaptal.model.Account
 import com.Muncho.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,11 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.Calendar
-import java.util.Locale
-import java.util.UUID
-
-import java.util.Date
+import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.math.abs
 
 enum class RecurrenceEditScope {
@@ -209,56 +210,9 @@ class AccountDetailViewModel : ViewModel() {
         }
     }
 
-    fun generateInstallments(
-        accountId: String,
-        linkedAccountId: String?,
-        amount: Double,
-        months: Int,
-        startDate: Date,
-        title: String
-    ) {
-        viewModelScope.launch {
-            try {
-                val cal = Calendar.getInstance().apply { time = startDate }
-                val transactionsRef = db.collection("accounts").document(accountId).collection("transactions")
-                val linkedRef = linkedAccountId?.let { db.collection("accounts").document(it).collection("transactions") }
-
-                for (i in 0 until months) {
-                    val date = Timestamp(cal.time)
-                    
-                    // 1. Crédit (Réduction de la dette)
-                    val creditTx = Transaction(
-                        title = title,
-                        amount = abs(amount),
-                        type = "INCOME",
-                        familyCategory = "Crédit",
-                        subCategory = "Mensualité",
-                        date = date,
-                        checkedMonths = emptyList()
-                    )
-                    transactionsRef.add(creditTx)
-                    
-                    // 2. Débit (Sortie d'argent du compte lié)
-                    if (linkedRef != null) {
-                        val debitTx = Transaction(
-                            title = title,
-                            amount = -abs(amount),
-                            type = "EXPENSE",
-                            familyCategory = "Crédit",
-                            subCategory = "Mensualité",
-                            date = date,
-                            checkedMonths = emptyList()
-                        )
-                        linkedRef.add(debitTx)
-                    }
-                    
-                    cal.add(Calendar.MONTH, 1)
-                }
-            } catch (e: Exception) {
-                Log.e("CREDIT_DEBUG", "Erreur génération mensualités", e)
-            }
-        }
-    }
+    /*
+    fun generateInstallments(...) { ... }
+    */
 
     /**
      * Gestion avancée de la modification d'une récurrence selon la portée choisie.
@@ -359,7 +313,7 @@ class AccountDetailViewModel : ViewModel() {
                             subCategory = newSubCategory,
                             type = newType,
                             paymentMethod = newPaymentMethod,
-                            date = effectiveDate,
+                            date = newDate, // Correction : on utilise la date choisie (ex: le 15) au lieu de l'effectiveDate (le 1er)
                             isRecurring = newIsRecurring,
                             recurrenceInterval = newRecurrenceInterval,
                             endDate = newEndDate,
@@ -406,7 +360,7 @@ class AccountDetailViewModel : ViewModel() {
                             subCategory = newSubCategory,
                             type = newType,
                             paymentMethod = newPaymentMethod,
-                            date = effectiveDate,
+                            date = newDate, // Correction : on utilise la date choisie (ex: le 15) au lieu de l'effectiveDate (le 1er)
                             isRecurring = false,
                             checkedMonths = emptyList(),
                             transferGroupId = newTransferGroupId,
@@ -578,6 +532,110 @@ class AccountDetailViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 Log.e("DELETE_SCOPE_DEBUG", "Erreur lors de la suppression avec portée", e)
+            }
+        }
+    }
+
+    private val _importStatus = MutableStateFlow<String?>(null)
+    val importStatus: StateFlow<String?> = _importStatus.asStateFlow()
+
+    fun clearImportStatus() { _importStatus.value = null }
+
+    fun generateLoanInstallments(
+        context: Context,
+        account: Account,
+        startDate: Date,
+        monthlyPayment: Double,
+        durationMonths: Int,
+        totalCapital: Double,
+        insurance: Double,
+        rate: Double,
+        withdrawalDay: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                _importStatus.value = "Génération de l'échéancier..."
+                
+                // 1. Mettre à jour l'en-tête du compte
+                val updates = mutableMapOf<String, Any?>(
+                    "totalAmount" to totalCapital,
+                    "loanStartDate" to SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(startDate),
+                    "loanMonthlyPayment" to monthlyPayment,
+                    "loanInsurance" to insurance,
+                    "loanRate" to rate
+                )
+                db.collection("accounts").document(account.id).update(updates).await()
+
+                // 2. Préparer les dates
+                val cal = Calendar.getInstance().apply { time = startDate }
+                val currentMonthStart = Calendar.getInstance().apply {
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+
+                val transactionsRef = db.collection("accounts").document(account.id).collection("transactions")
+                val linkedRef = account.linkedAccountId?.let { db.collection("accounts").document(it).collection("transactions") }
+
+                val batch = db.batch()
+                val totalMonthly = monthlyPayment + insurance
+                val transferGroupIdPrefix = "LOAN_${account.id}_"
+
+                for (i in 0 until durationMonths) {
+                    // On force le jour de prélèvement choisi tout en gérant les mois courts (ex: 31 février)
+                    val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    cal.set(Calendar.DAY_OF_MONTH, minOf(withdrawalDay, maxDay))
+                    
+                    val date = Timestamp(cal.time)
+                    val currentGroupId = "${transferGroupIdPrefix}${i}"
+                    
+                    // Transaction sur le compte CREDIT (Remboursement)
+                    val creditTx = Transaction(
+                        title = "Échéance prêt ${account.name}",
+                        amount = totalMonthly,
+                        type = "INCOME",
+                        familyCategory = "Crédit",
+                        subCategory = "Amortissement",
+                        date = date,
+                        checkedMonths = emptyList(),
+                        principalPart = totalMonthly - insurance,
+                        insurancePart = insurance,
+                        transferGroupId = currentGroupId,
+                        targetAccountId = account.linkedAccountId
+                    )
+                    batch.set(transactionsRef.document(), creditTx)
+
+                    // Transaction sur le compte LIÉ (Débit) - UNIQUEMENT SI >= MOIS EN COURS
+                    if (linkedRef != null && !cal.before(currentMonthStart)) {
+                        val debitTx = Transaction(
+                            title = "Prélèvement prêt ${account.name}",
+                            amount = -totalMonthly,
+                            type = "EXPENSE",
+                            familyCategory = "Crédit",
+                            subCategory = "Mensualité",
+                            date = date,
+                            checkedMonths = emptyList(),
+                            transferGroupId = currentGroupId,
+                            targetAccountId = account.id
+                        )
+                        batch.set(db.collection("accounts").document(account.linkedAccountId!!).collection("transactions").document(), debitTx)
+                    }
+                    
+                    cal.add(Calendar.MONTH, 1)
+                }
+                
+                // Mettre à jour la date de fin
+                cal.add(Calendar.MONTH, -1)
+                db.collection("accounts").document(account.id).update("loanEndDate", SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(cal.time)).await()
+
+                batch.commit().await()
+                _importStatus.value = "Échéancier généré : $durationMonths mensualités créées."
+                
+            } catch (e: Exception) {
+                Log.e("LOAN_GEN_DEBUG", "Erreur lors de la génération", e)
+                _importStatus.value = "Erreur lors de la génération : ${e.localizedMessage}"
             }
         }
     }

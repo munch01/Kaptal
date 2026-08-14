@@ -1,10 +1,12 @@
 package com.Muncho.kaptal
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.Muncho.kaptal.model.Account
 import com.Muncho.kaptal.model.Transaction
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -18,9 +20,9 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.math.abs
 
 // --- ÉTATS DE L'UI ---
 sealed interface AccountsUiState {
@@ -388,7 +390,7 @@ class MainViewModel : ViewModel() {
         isJoint: Boolean,
         color: String,
         linkedAccountId: String? = null,
-        onAccountCreated: (String) -> Unit
+        onAccountCreated: (String) -> Unit = {}
     ) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
@@ -449,8 +451,43 @@ class MainViewModel : ViewModel() {
     fun deleteAccount(accountId: String) {
         viewModelScope.launch {
             try {
+                // 1. Récupérer les infos du compte avant suppression pour la cascade
+                val accountDoc = firestore.collection("accounts").document(accountId).get().await()
+                val type = accountDoc.getString("type")
+                val linkedId = accountDoc.getString("linkedAccountId")
+
+                // 2. Si c'est un crédit avec un compte lié, supprimer les transactions miroirs
+                if (type == "CREDIT" && !linkedId.isNullOrBlank()) {
+                    val linkedTransactions = firestore.collection("accounts")
+                        .document(linkedId)
+                        .collection("transactions")
+                        .whereEqualTo("targetAccountId", accountId)
+                        .get()
+                        .await()
+                    
+                    val batch = firestore.batch()
+                    linkedTransactions.forEach { doc ->
+                        batch.delete(doc.reference)
+                    }
+                    batch.commit().await()
+                }
+
+                // 3. Supprimer les transactions du compte lui-même (Bonne pratique Firestore)
+                val selfTransactions = firestore.collection("accounts")
+                    .document(accountId)
+                    .collection("transactions")
+                    .get()
+                    .await()
+                
+                val selfBatch = firestore.batch()
+                selfTransactions.forEach { doc -> selfBatch.delete(doc.reference) }
+                selfBatch.commit().await()
+
+                // 4. Supprimer le compte
                 firestore.collection("accounts").document(accountId).delete().await()
-            } catch (e: Exception) { }
+            } catch (e: Exception) { 
+                Log.e("DELETE_ACCOUNT_DEBUG", "Erreur lors de la suppression cascade", e)
+            }
         }
     }
 
@@ -490,6 +527,70 @@ class MainViewModel : ViewModel() {
                 }
                 batch.commit().await()
             } catch (e: Exception) { }
+        }
+    }
+
+    fun generateInstallments(
+        accountId: String,
+        linkedAccountId: String?,
+        totalMonthly: Double,
+        months: Int,
+        startDate: Date,
+        title: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val cal = Calendar.getInstance().apply { time = startDate }
+                val now = Calendar.getInstance()
+                val currentMonthStart = Calendar.getInstance().apply {
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+
+                val transactionsRef = firestore.collection("accounts").document(accountId).collection("transactions")
+                val linkedRef = linkedAccountId?.let { firestore.collection("accounts").document(it).collection("transactions") }
+
+                val batch = firestore.batch()
+
+                for (i in 0 until months) {
+                    val date = Timestamp(cal.time)
+                    
+                    // 1. Crédit (Réduction de la dette) - TOUJOURS CRÉÉ
+                    val creditTx = Transaction(
+                        title = title,
+                        amount = abs(totalMonthly),
+                        type = "INCOME",
+                        familyCategory = "Crédit",
+                        subCategory = "Mensualité",
+                        date = date,
+                        checkedMonths = emptyList()
+                    )
+                    batch.set(transactionsRef.document(), creditTx)
+                    
+                    // 2. Débit (Sortie d'argent du compte lié) - UNIQUEMENT SI >= MOIS EN COURS
+                    if (linkedRef != null && !cal.before(currentMonthStart)) {
+                        val debitTx = Transaction(
+                            title = title,
+                            amount = -abs(totalMonthly),
+                            type = "EXPENSE",
+                            familyCategory = "Crédit",
+                            subCategory = "Mensualité",
+                            date = date,
+                            checkedMonths = emptyList(),
+                            targetAccountId = accountId // Pour lien de suppression
+                        )
+                        batch.set(linkedRef.document(), debitTx)
+                    }
+                    
+                    cal.add(Calendar.MONTH, 1)
+                }
+                batch.commit().await()
+            } catch (e: Exception) {
+                Log.e("CREDIT_GEN_DEBUG", "Erreur lors de la génération des mensualités", e)
+            }
         }
     }
 

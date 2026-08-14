@@ -195,13 +195,23 @@ fun StandardAccountScreen(
                                 detailViewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
                             },
                             onEditClick = { transaction ->
-                                val targetCal = Calendar.getInstance().apply {
+                                // On prépare la date "pivot" au 1er du mois pour la logique de série
+                                val pivotCal = Calendar.getInstance().apply {
                                     set(year, month, 1, 0, 0, 0)
                                     set(Calendar.MILLISECOND, 0)
                                 }
-                                val effectiveTimestamp = Timestamp(targetCal.time)
+                                val pivotTimestamp = Timestamp(pivotCal.time)
+
+                                // On prépare la date "visuelle" pour le calendrier (on garde le jour d'origine)
+                                val visualCal = Calendar.getInstance().apply {
+                                    time = transaction.date.toDate()
+                                    set(Calendar.YEAR, year)
+                                    set(Calendar.MONTH, month)
+                                }
+                                val visualTransaction = transaction.copy(date = Timestamp(visualCal.time))
+
                                 if (transaction.isRecurring) {
-                                    showEditChoiceDialog = Pair(transaction, effectiveTimestamp)
+                                    showEditChoiceDialog = Pair(visualTransaction, pivotTimestamp)
                                 } else {
                                     transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
                                 }
@@ -631,7 +641,15 @@ fun MonthPageContent(
     val monthTransactions = remember(transactions, year, month) {
         transactions
             .filter { tx -> isTransactionActiveInMonth(tx, year, month) }
-            .sortedBy { tx -> tx.date.seconds }
+            .sortedWith(compareBy<Transaction> { tx ->
+                // Tri principal : le jour du mois (Ordre chronologique : 1, 2, 3...)
+                val cal = Calendar.getInstance().apply { time = tx.date.toDate() }
+                if (tx.isRecurring) {
+                    cal.set(Calendar.YEAR, year)
+                    cal.set(Calendar.MONTH, month)
+                }
+                cal.timeInMillis
+            }.thenBy { it.id }) // Tri secondaire pour la stabilité
             .toList()
     }
 
@@ -929,7 +947,21 @@ fun TransactionItem(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Case à cocher vraiment ronde
+                        // Date de l'opération (Jour uniquement)
+                        Box(
+                            modifier = Modifier.width(36.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val txDate = transaction.date.toDate()
+                            Text(
+                                text = SimpleDateFormat("dd", Locale.FRANCE).format(txDate),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        // Case à cocher ronde
                         Box(
                             modifier = Modifier
                                 .size(22.dp)
@@ -949,21 +981,23 @@ fun TransactionItem(
                             }
                         }
 
-                        // Titre uniquement (sans catégories)
-                        Column {
-                            Text(
-                                text = transaction.title ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                        // Titre
+                        Text(
+                            text = transaction.title ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
                     }
+
+                    val isCreditDebit = transaction.type == "EXPENSE" && transaction.familyCategory == "Crédit"
+                    val amountColor = if (transaction.amount >= 0) positiveColor else if (isCreditDebit) Color(0xFF1976D2) else negativeColor
 
                     Text(
                         text = "%.2f €".format(transaction.amount),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (transaction.amount >= 0) positiveColor else negativeColor
+                        color = amountColor
                     )
                 }
             }

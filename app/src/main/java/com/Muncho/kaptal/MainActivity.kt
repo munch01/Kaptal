@@ -21,9 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.Muncho.kaptal.screens.CreditAccountScreen
 import com.Muncho.kaptal.screens.CryptoScreen
 import com.Muncho.kaptal.screens.StandardAccountScreen
@@ -33,6 +35,7 @@ import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.firebase.auth.FirebaseAuth
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -49,6 +52,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialisation de la lecture PDF
+        PDFBoxResourceLoader.init(this)
         
         appUpdateManager = AppUpdateManagerFactory.create(this)
         checkForUpdates()
@@ -179,10 +185,14 @@ fun KaptalApp(
             }
 
             composable("home") {
+                val context = LocalContext.current
                 HomeScreen(
                     viewModel = viewModel,
                     onNavigateToSettings = {
                         navController.navigate("settings")
+                    },
+                    onNavigateToAddAccount = { typeKey ->
+                        navController.navigate("add_account/$typeKey")
                     },
                     onAccountClick = { account ->
                         viewModel.selectAccount(account)
@@ -192,7 +202,37 @@ fun KaptalApp(
                             else -> navController.navigate("standard_detail")
                         }
                     },
-                    onExit = { activity.finish() }
+                    onExit = { 
+                        activity.finish()
+                    }
+                )
+            }
+
+            composable(
+                route = "add_account/{typeKey}",
+                arguments = listOf(navArgument("typeKey") { type = NavType.StringType; defaultValue = "CHECKING" })
+            ) { backStackEntry ->
+                val typeKey = backStackEntry.arguments?.getString("typeKey")
+                AddAccountScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = viewModel,
+                    initialTypeKey = typeKey,
+                    onAccountAdded = { name, bank, balance, type, isJoint, color, linkedId, memberEmail ->
+                        viewModel.addAccount(
+                            name = name,
+                            bankName = bank,
+                            initialBalance = balance,
+                            type = type,
+                            isJoint = isJoint,
+                            color = color,
+                            linkedAccountId = linkedId
+                        ) { accountId ->
+                            if (isJoint && !memberEmail.isNullOrBlank()) {
+                                viewModel.addMemberToAccount(accountId, memberEmail) { _, _ -> }
+                            }
+                        }
+                        navController.popBackStack()
+                    }
                 )
             }
 
@@ -238,15 +278,19 @@ fun KaptalApp(
             }
 
             composable("credit_detail") {
-                val account by viewModel.selectedAccount.collectAsState()
                 val uiState by viewModel.uiState.collectAsState()
+                val selectedAcc by viewModel.selectedAccount.collectAsState()
                 val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                
+                // On récupère la version la plus fraîche du compte
+                val currentAccount = allAccounts.find { it.id == selectedAcc?.id } ?: selectedAcc
 
-                account?.let {
+                currentAccount?.let {
                     CreditAccountScreen(
                         account = it,
                         allAccounts = allAccounts,
-                        onBackClick = { navController.popBackStack() }
+                        onBackClick = { navController.popBackStack() },
+                        mainViewModel = viewModel
                     )
                 }
             }
