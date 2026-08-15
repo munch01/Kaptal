@@ -1,6 +1,7 @@
 package com.Muncho.kaptal.viewmodel
 
-import com.Muncho.kaptal.utils.AmortizationParser
+import com.Muncho.kaptal.utils.PdfRow
+import com.Muncho.kaptal.utils.PdfTableExtractor
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -11,11 +12,13 @@ import com.Muncho.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
@@ -541,6 +544,22 @@ class AccountDetailViewModel : ViewModel() {
 
     fun clearImportStatus() { _importStatus.value = null }
 
+    private suspend fun clearExistingLoanData(accountId: String, linkedAccountId: String?) {
+        // 1. Supprimer transactions du compte crédit
+        val selfTxs = db.collection("accounts").document(accountId).collection("transactions").get().await()
+        val batch = db.batch()
+        selfTxs.forEach { batch.delete(it.reference) }
+        
+        // 2. Supprimer les débits liés sur le compte courant
+        if (linkedAccountId != null) {
+            val linkedTxs = db.collection("accounts").document(linkedAccountId).collection("transactions")
+                .whereEqualTo("targetAccountId", accountId)
+                .get().await()
+            linkedTxs.forEach { batch.delete(it.reference) }
+        }
+        batch.commit().await()
+    }
+
     fun generateLoanInstallments(
         context: Context,
         account: Account,
@@ -554,7 +573,11 @@ class AccountDetailViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
+                _importStatus.value = "Nettoyage des anciennes données..."
+                clearExistingLoanData(account.id, account.linkedAccountId)
+                
                 _importStatus.value = "Génération de l'échéancier..."
+                // ... reste du code de génération
                 
                 // 1. Mettre à jour l'en-tête du compte
                 val updates = mutableMapOf<String, Any?>(
@@ -633,7 +656,10 @@ class AccountDetailViewModel : ViewModel() {
                             transferGroupId = currentGroupId,
                             targetAccountId = account.id
                         )
-                        batch.set(db.collection("accounts").document(account.linkedAccountId!!).collection("transactions").document(), debitTx)
+                        val targetId = account.linkedAccountId
+                        if (targetId != null) {
+                            batch.set(db.collection("accounts").document(targetId).collection("transactions").document(), debitTx)
+                        }
                     }
                     
                     cal.add(Calendar.MONTH, 1)
@@ -651,6 +677,138 @@ class AccountDetailViewModel : ViewModel() {
                 _importStatus.value = "Erreur lors de la génération : ${e.localizedMessage}"
             }
         }
+    }
+
+    private val _pdfRows = MutableStateFlow<List<PdfRow>>(emptyList())
+    val pdfRows: StateFlow<List<PdfRow>> = _pdfRows.asStateFlow()
+
+    fun extractPdfData(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                _importStatus.value = "Analyse spatiale du PDF..."
+                val extractor = PdfTableExtractor(context)
+                val rows = withContext(Dispatchers.IO) {
+                    extractor.extractTableData(uri)
+                }
+                _pdfRows.value = rows
+                _importStatus.value = if (rows.isNotEmpty()) "PDF analysé. Sélectionnez vos colonnes." else "Erreur : Document vide"
+            } catch (e: Exception) {
+                _importStatus.value = "Erreur lecture PDF : ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun clearPdfData() { _pdfRows.value = emptyList() }
+
+    fun importFromSelectedColumns(
+        accountId: String,
+        linkedAccountId: String?,
+        dateIdx: Int,
+        amountIdx: Int,
+        capitalIdx: Int
+    ) {
+        val rows = _pdfRows.value
+        if (rows.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                _importStatus.value = "Nettoyage des anciennes données..."
+                clearExistingLoanData(accountId, linkedAccountId)
+
+                _importStatus.value = "Génération de l'échéancier..."
+                val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
+                val currentMonthStart = Calendar.getInstance().apply {
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+
+                val batch = db.batch()
+                val transactionsRef = db.collection("accounts").document(accountId).collection("transactions")
+                val transferGroupIdPrefix = "LOAN_PDF_${accountId}_"
+                
+                var importedCount = 0
+                var firstDate: Date? = null
+                var lastDate: Date? = null
+                var totalAmountFromPdf = 0.0
+
+                rows.forEachIndexed { rowIndex, pdfRow ->
+                    val dateCell = pdfRow.cells.getOrNull(dateIdx)
+                    val amountCell = pdfRow.cells.getOrNull(amountIdx)
+                    val capitalCell = if (capitalIdx != -1) pdfRow.cells.getOrNull(capitalIdx) else null
+
+                    // On tente de parser la date pour valider que c'est une ligne de données
+                    val date = try { dateCell?.text?.let { dateFormat.parse(it) } } catch (e: Exception) { null }
+                    val amount = amountCell?.text?.cleanAmount() ?: 0.0
+
+                    if (date != null && amount > 0) {
+                        val timestamp = Timestamp(date)
+                        if (firstDate == null) firstDate = date
+                        lastDate = date
+
+                        val currentGroupId = "${transferGroupIdPrefix}${rowIndex}"
+                        
+                        // 1. Crédit (Remboursement)
+                        val creditTx = Transaction(
+                            title = "Échéance prêt (Import PDF)",
+                            amount = amount,
+                            type = "INCOME",
+                            familyCategory = "Crédit",
+                            subCategory = "Amortissement",
+                            date = timestamp,
+                            checkedMonths = emptyList(),
+                            principalPart = capitalCell?.text?.cleanAmount() ?: 0.0, // On utilise la colonne capital si dispo
+                            transferGroupId = currentGroupId,
+                            targetAccountId = linkedAccountId
+                        )
+                        batch.set(transactionsRef.document(), creditTx)
+
+                        // 2. Débit (Compte lié) - Uniquement futur
+                        if (linkedAccountId != null && !date.before(currentMonthStart.time)) {
+                            val debitTx = Transaction(
+                                title = "Prélèvement prêt (Import PDF)",
+                                amount = -amount,
+                                type = "EXPENSE",
+                                familyCategory = "Crédit",
+                                subCategory = "Mensualité",
+                                date = timestamp,
+                                checkedMonths = emptyList(),
+                                transferGroupId = currentGroupId,
+                                targetAccountId = accountId
+                            )
+                            batch.set(db.collection("accounts").document(linkedAccountId).collection("transactions").document(), debitTx)
+                        }
+                        
+                        importedCount++
+                    }
+                }
+
+                if (importedCount > 0) {
+                    // Mettre à jour l'en-tête du compte
+                    val updates = mutableMapOf<String, Any?>()
+                    firstDate?.let { updates["loanStartDate"] = dateFormat.format(it) }
+                    lastDate?.let { updates["loanEndDate"] = dateFormat.format(it) }
+                    db.collection("accounts").document(accountId).update(updates).await()
+
+                    batch.commit().await()
+                    _importStatus.value = "Importation réussie : $importedCount mensualités créées."
+                } else {
+                    _importStatus.value = "Erreur : Aucune donnée valide trouvée dans les colonnes choisies."
+                }
+                
+                clearPdfData()
+
+            } catch (e: Exception) {
+                Log.e("PDF_IMPORT", "Erreur import colonnes", e)
+                _importStatus.value = "Erreur lors de l'import : ${e.localizedMessage}"
+            }
+        }
+    }
+
+    private fun String.cleanAmount(): Double {
+        return this.replace(" ", "").replace(",", ".").replace("€", "").toDoubleOrNull() ?: 0.0
     }
 
     override fun onCleared() {

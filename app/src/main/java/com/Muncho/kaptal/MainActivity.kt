@@ -27,7 +27,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.Muncho.kaptal.screens.CreditAccountScreen
-import com.Muncho.kaptal.screens.CryptoScreen
 import com.Muncho.kaptal.screens.StandardAccountScreen
 import com.Muncho.kaptal.ui.theme.KaptalTheme
 import com.google.android.play.core.appupdate.AppUpdateManager
@@ -48,7 +47,16 @@ class MainActivity : FragmentActivity() {
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
-        super.attachBaseContext(LocaleHelper.setLocale(newBase, lang))
+        val locale = when (lang) {
+            "English" -> Locale.ENGLISH
+            "Español" -> Locale("es")
+            else -> Locale.FRENCH
+        }
+        Locale.setDefault(locale)
+        val config = newBase.resources.configuration
+        config.setLocale(locale)
+        val context = newBase.createConfigurationContext(config)
+        super.attachBaseContext(context)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -196,12 +204,12 @@ fun KaptalApp(
                         navController.navigate("add_account/$typeKey")
                     },
                     onAccountClick = { account ->
-                        viewModel.selectAccount(account)
-                        when (account.type) {
-                            "CREDIT" -> navController.navigate("credit_detail")
-                            "LIVRET_A" -> navController.navigate("livret_a_detail")
-                            else -> navController.navigate("standard_detail")
+                        val route = when (account.type) {
+                            "CREDIT" -> "credit_detail"
+                            "LIVRET_A" -> "livret_a_detail"
+                            else -> "standard_detail"
                         }
+                        navController.navigate("$route/${account.id}")
                     },
                     onExit = { 
                         activity.finish()
@@ -234,26 +242,11 @@ fun KaptalApp(
                             
                             if (type == "CREDIT") {
                                 coroutineScope.launch {
-                                    delay(800)
-                                    val state = viewModel.uiState.value
-                                    if (state is AccountsUiState.Success) {
-                                        val newAcc = state.accounts.find { it.id == accountId }
-                                        if (newAcc != null) {
-                                            viewModel.selectAccount(newAcc)
-                                            navController.navigate("credit_detail")
-                                        }
-                                    }
+                                    delay(1000)
+                                    navController.navigate("credit_detail/$accountId")
                                 }
                             }
                         }
-                        navController.popBackStack()
-                    }
-                )
-            }
-
-            composable("crypto") {
-                CryptoScreen(
-                    onBackClick = {
                         navController.popBackStack()
                     }
                 )
@@ -274,56 +267,93 @@ fun KaptalApp(
                 )
             }
 
-            composable("standard_detail") {
-                val account by viewModel.selectedAccount.collectAsState()
+            composable(
+                route = "standard_detail/{accountId}",
+                arguments = listOf(navArgument("accountId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                 val uiState by viewModel.uiState.collectAsState()
-                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
                 
-                account?.let { acc ->
-                    StandardAccountScreen(
-                        account = acc,
-                        allAccounts = allAccounts,
-                        initialPage = viewModel.getSavedPagerPosition(acc.id),
-                        onPageChanged = { page ->
-                            viewModel.savePagerPosition(acc.id, page)
-                        },
-                        onBackClick = { navController.popBackStack() }
-                    )
+                when (val state = uiState) {
+                    is AccountsUiState.Success -> {
+                        val account = state.accounts.find { it.id == accountId }
+                        account?.let { acc ->
+                            StandardAccountScreen(
+                                account = acc,
+                                allAccounts = state.accounts,
+                                initialPage = viewModel.getSavedPagerPosition(acc.id),
+                                onPageChanged = { page ->
+                                    viewModel.savePagerPosition(acc.id, page)
+                                },
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                    }
+                    is AccountsUiState.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    else -> {}
                 }
             }
 
-            composable("credit_detail") {
+            composable(
+                route = "credit_detail/{accountId}",
+                arguments = listOf(navArgument("accountId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                 val uiState by viewModel.uiState.collectAsState()
-                val selectedAcc by viewModel.selectedAccount.collectAsState()
-                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
                 
-                val currentAccount = allAccounts.find { it.id == selectedAcc?.id } ?: selectedAcc
-
-                currentAccount?.let {
-                    CreditAccountScreen(
-                        account = it,
-                        allAccounts = allAccounts,
-                        onBackClick = { navController.popBackStack() },
-                        mainViewModel = viewModel
-                    )
+                when (val state = uiState) {
+                    is AccountsUiState.Success -> {
+                        val account = state.accounts.find { it.id == accountId }
+                        account?.let { acc ->
+                            CreditAccountScreen(
+                                account = acc,
+                                allAccounts = state.accounts,
+                                onBackClick = { navController.popBackStack() },
+                                mainViewModel = viewModel
+                            )
+                        }
+                    }
+                    is AccountsUiState.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    else -> {}
                 }
             }
 
-            composable("livret_a_detail") {
-                val account by viewModel.selectedAccount.collectAsState()
+            composable(
+                route = "livret_a_detail/{accountId}",
+                arguments = listOf(navArgument("accountId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                 val uiState by viewModel.uiState.collectAsState()
-                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
-
-                account?.let { acc ->
-                    StandardAccountScreen(
-                        account = acc,
-                        allAccounts = allAccounts,
-                        initialPage = viewModel.getSavedPagerPosition(acc.id),
-                        onPageChanged = { page ->
-                            viewModel.savePagerPosition(acc.id, page)
-                        },
-                        onBackClick = { navController.popBackStack() }
-                    )
+                
+                when (val state = uiState) {
+                    is AccountsUiState.Success -> {
+                        val account = state.accounts.find { it.id == accountId }
+                        account?.let { acc ->
+                            StandardAccountScreen(
+                                account = acc,
+                                allAccounts = state.accounts,
+                                initialPage = viewModel.getSavedPagerPosition(acc.id),
+                                onPageChanged = { page ->
+                                    viewModel.savePagerPosition(acc.id, page)
+                                },
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                    }
+                    is AccountsUiState.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    else -> {}
                 }
             }
         }

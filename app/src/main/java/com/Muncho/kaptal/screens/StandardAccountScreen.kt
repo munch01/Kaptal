@@ -787,7 +787,8 @@ fun MonthPageContent(
 }
 
 private fun isTransactionActiveInMonth(tx: Transaction, year: Int, month: Int): Boolean {
-    val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+    val txDate = tx.date.toDate()
+    val txCal = Calendar.getInstance().apply { time = txDate }
     val txYear = txCal.get(Calendar.YEAR)
     val txMonth = txCal.get(Calendar.MONTH)
 
@@ -797,7 +798,8 @@ private fun isTransactionActiveInMonth(tx: Transaction, year: Int, month: Int): 
     return if (tx.isRecurring) {
         val startsBeforeOrDuring = startIndex <= targetIndex
         val endsAfterOrDuring = if (tx.endDate != null) {
-            val endCal = Calendar.getInstance().apply { time = tx.endDate!!.toDate() }
+            val endDate = tx.endDate.toDate()
+            val endCal = Calendar.getInstance().apply { time = endDate }
             val endIndex = endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
             targetIndex < endIndex
         } else {
@@ -822,7 +824,8 @@ private fun computeCumulativeBalance(
     var total = initialBalance
 
     for (tx in transactions) {
-        val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+        val txDate = tx.date.toDate()
+        val txCal = Calendar.getInstance().apply { time = txDate }
         val startIndex = txCal.get(Calendar.YEAR) * 12 + txCal.get(Calendar.MONTH)
 
         if (tx.isRecurring) {
@@ -834,15 +837,23 @@ private fun computeCumulativeBalance(
             val effectiveEndIndex = minOf(targetIndex, endIndex - 1)
 
             if (startIndex <= effectiveEndIndex) {
-                for (mIndex in startIndex..effectiveEndIndex) {
-                    val y = mIndex / 12
-                    val m = mIndex % 12
-                    if (onlyChecked) {
-                        val mKey = String.format(Locale.US, "%d-%02d", y, m + 1)
-                        if (tx.isCheckedForMonth(mKey)) total += tx.amount
-                    } else {
-                        total += tx.amount
+                if (onlyChecked) {
+                    // Si on ne veut que les pointés, on itère sur les mois cochés
+                    for (mKey in tx.checkedMonths) {
+                        try {
+                            val parts = mKey.split("-")
+                            val y = parts[0].toInt()
+                            val m = parts[1].toInt() - 1
+                            val mIndex = y * 12 + m
+                            if (mIndex in startIndex..effectiveEndIndex) {
+                                total += tx.amount
+                            }
+                        } catch (e: Exception) {}
                     }
+                } else {
+                    // Si on veut tout, calcul mathématique simple sans boucle
+                    val count = (effectiveEndIndex - startIndex + 1)
+                    total += tx.amount * count
                 }
             }
         } else {

@@ -11,13 +11,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
@@ -124,19 +123,21 @@ fun HomeScreen(
                     },
                     actions = {
                         IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                data = Uri.parse("mailto:3lmunch0@gmail.com?subject=Support%20Kaptal")
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:3lmunch0@gmail.com")
+                                putExtra(Intent.EXTRA_SUBJECT, "Support Kaptal")
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             try {
-                                context.startActivity(intent)
+                                val chooser = Intent.createChooser(intent, "Envoyer un e-mail via...")
+                                activity.startActivity(chooser)
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Erreur : aucune appli d'email", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(activity, "Erreur : aucune appli d'email", Toast.LENGTH_SHORT).show()
                             }
                         }) {
                             Icon(Icons.Default.AlternateEmail, contentDescription = "Support Email", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = onNavigateToSettings) {
+                        IconButton(onClick = { onNavigateToSettings() }) {
                             Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
                         }
                     },
@@ -170,7 +171,7 @@ fun HomeScreen(
                                     1 -> state.accounts.filter { it.type == "SAVINGS" || it.type == "LIVRET_A" }
                                     2 -> state.accounts.filter { it.type == "CREDIT" }
                                     else -> state.accounts.filter { it.type == "CRYPTO" }
-                                }
+                                }.sortedBy { it.order }
                             }
 
                             if (filteredAccounts.isEmpty()) {
@@ -376,7 +377,7 @@ fun HomeScreen(
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://ko-fi.com/elmuncho")).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(intent)
+                            activity.startActivity(intent)
                         },
                     shape = RoundedCornerShape(24.dp),
                     color = Color.White.copy(alpha = 0.7f),
@@ -392,17 +393,17 @@ fun HomeScreen(
         }
     }
 
-    if (accountToEdit != null) {
+    accountToEdit?.let { currentEdit ->
         val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
         AccountFormDialog(
             title = stringResource(R.string.account_edit_title),
-            initialAccount = accountToEdit,
+            initialAccount = currentEdit,
             allAccounts = allAccounts,
             onDismiss = { accountToEdit = null },
             onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, _, linkedAccountId ->
-                viewModel.updateAccount(accountToEdit!!.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId) {
+                viewModel.updateAccount(currentEdit.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId) {
                     if (isJoint && memberEmail.isNotBlank()) {
-                        viewModel.addMemberToAccount(accountToEdit!!.id, memberEmail) { _, message ->
+                        viewModel.addMemberToAccount(currentEdit.id, memberEmail) { _, message ->
                             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -455,10 +456,12 @@ fun AccountCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accountColor = try {
-        Color(android.graphics.Color.parseColor(account.color))
-    } catch (e: Exception) {
-        MaterialTheme.colorScheme.primary
+    val accountColor = remember(account.color) {
+        try {
+            Color(android.graphics.Color.parseColor(account.color))
+        } catch (e: Exception) {
+            Color(0xFF2196F3)
+        }
     }
 
     Card(

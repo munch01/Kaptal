@@ -41,8 +41,8 @@ fun SettingsScreen(
     allBalances: Map<String, Double> = emptyMap(),
     viewModel: SettingsViewModel = viewModel()
 ) {
-    val activity = LocalActivity.current
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val currentUser = viewModel.currentUser
 
     // Dialogues
@@ -63,10 +63,10 @@ fun SettingsScreen(
                 activity.contentResolver.openOutputStream(it)?.use { stream ->
                     stream.write(data.toByteArray())
                 }
-                Toast.makeText(activity, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(activity, "Erreur lors de l'export JSON", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Erreur lors de l'export JSON", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -77,10 +77,10 @@ fun SettingsScreen(
                 activity.contentResolver.openOutputStream(it)?.use { stream ->
                     stream.write(data.toByteArray())
                 }
-                Toast.makeText(activity, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(activity, "Erreur lors de l'export CSV", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Erreur lors de l'export CSV", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -245,7 +245,7 @@ fun SettingsScreen(
                             subtitle = stringResource(R.string.settings_password_subtitle),
                             onClick = {
                                 viewModel.sendPasswordResetEmail { success, message ->
-                                    Toast.makeText(activity, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
                                 }
                             }
                         )
@@ -309,7 +309,7 @@ fun SettingsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal")).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                activity.startActivity(intent)
+                                context.startActivity(intent)
                             }
                         )
 
@@ -324,7 +324,7 @@ fun SettingsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE")).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                activity.startActivity(intent)
+                                context.startActivity(intent)
                             }
                         )
 
@@ -339,7 +339,7 @@ fun SettingsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://munch01.github.io/Kaptal/index.md")).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                activity.startActivity(intent)
+                                context.startActivity(intent)
                             }
                         )
 
@@ -516,7 +516,7 @@ fun SettingsScreen(
                     enabled = newEmailText.isNotBlank(),
                     onClick = {
                         viewModel.updateEmail(newEmailText) { _, msg ->
-                            Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                             showEmailDialog = false
                         }
                     }
@@ -553,7 +553,7 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     onClick = {
                         viewModel.deleteAccount { success, msg ->
-                            Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                             showDeleteAccountDialog = false
                             if (success) onBackClick()
                         }

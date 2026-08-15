@@ -308,55 +308,43 @@ class MainViewModel : ViewModel() {
     }
 
     private fun recalculateBalances(accounts: List<Account>) {
-        val balancesMap = accounts.associate { account ->
-            val txs = accountTransactionsMap[account.id] ?: emptyList()
-            account.id to calculateCurrentRealBalance(account, txs)
-        }
-        
-        val debtsMap = accounts.filter { it.type == "CREDIT" }.associate { account ->
-            val txs = accountTransactionsMap[account.id] ?: emptyList()
-            val initialCapital = account.totalAmount ?: 0.0
+        viewModelScope.launch(Dispatchers.Default) {
+            val balancesMap = accounts.associate { account ->
+                val txs = accountTransactionsMap[account.id] ?: emptyList()
+                account.id to calculateCurrentRealBalance(account, txs)
+            }
             
-            // On somme toutes les parts de CAPITAL (principalPart) déjà remboursées jusqu'à aujourd'hui
-            val now = Calendar.getInstance().timeInMillis
-            val totalPrincipalRepaid = txs.filter { it.type == "INCOME" && it.date.toDate().time <= now }
-                                         .sumOf { it.principalPart ?: 0.0 }
-            
-            account.id to (initialCapital - totalPrincipalRepaid)
-        }
+            val debtsMap = accounts.filter { it.type == "CREDIT" }.associate { account ->
+                val txs = accountTransactionsMap[account.id] ?: emptyList()
+                val initialCapital = account.totalAmount ?: 0.0
+                val now = Calendar.getInstance().timeInMillis
+                
+                val totalPrincipalRepaid = txs.filter { 
+                    it.type == "INCOME" && it.date.toDate().time <= now 
+                }.sumOf { it.principalPart ?: 0.0 }
+                
+                account.id to (initialCapital - totalPrincipalRepaid)
+            }
 
-        _uiState.value = AccountsUiState.Success(accounts, balancesMap, debtsMap)
+            withContext(Dispatchers.Main) {
+                _uiState.value = AccountsUiState.Success(accounts, balancesMap, debtsMap)
+            }
+        }
     }
 
     private fun calculateCurrentRealBalance(account: Account, transactions: List<Transaction>): Double {
         var total = account.initialBalance
-        if (transactions.isEmpty()) return total
-
         val now = Calendar.getInstance()
-        val currentYear = now.get(Calendar.YEAR)
-        val currentMonth = now.get(Calendar.MONTH)
-
-        val minDate = transactions.minOf { it.date.toDate() }
-        val minCal = Calendar.getInstance().apply { time = minDate }
-
-        var iterYear = minCal.get(Calendar.YEAR)
-        var iterMonth = minCal.get(Calendar.MONTH)
-
-        while (iterYear < currentYear || (iterYear == currentYear && iterMonth <= currentMonth)) {
-            val mKey = String.format(Locale.US, "%d-%02d", iterYear, iterMonth + 1)
-
-            for (tx in transactions) {
-                if (isTransactionActiveInMonth(tx, iterYear, iterMonth)) {
-                    if (tx.isCheckedForMonth(mKey)) {
-                        total += tx.amount
-                    }
-                }
-            }
-
-            iterMonth++
-            if (iterMonth > 11) {
-                iterMonth = 0
-                iterYear++
+        
+        // Version optimisée : On somme simplement les transactions pointées
+        // (La logique des dates est gérée par le fait qu'une transaction ne peut être pointée que si elle existe)
+        total += transactions.sumOf { tx ->
+            if (tx.isRecurring) {
+                // Pour les récurrences, on compte combien de mois ont été cochés
+                tx.amount * tx.checkedMonths.size
+            } else {
+                // Pour les ponctuelles, on vérifie si elle est cochée (liste non vide)
+                if (tx.checkedMonths.isNotEmpty()) tx.amount else 0.0
             }
         }
 

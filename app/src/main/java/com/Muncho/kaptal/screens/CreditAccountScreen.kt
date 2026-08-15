@@ -2,6 +2,8 @@ package com.Muncho.kaptal.screens
 
 import android.app.DatePickerDialog
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,6 +52,11 @@ fun CreditAccountScreen(
     
     val importStatus by detailViewModel.importStatus.collectAsState()
     val transactions by detailViewModel.transactions.collectAsState()
+    val pdfRows by detailViewModel.pdfRows.collectAsState()
+
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { detailViewModel.extractPdfData(context, it) }
+    }
 
     LaunchedEffect(account.id) {
         detailViewModel.loadTransactions(account.id)
@@ -57,7 +65,7 @@ fun CreditAccountScreen(
     LaunchedEffect(importStatus) {
         importStatus?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            if (it.startsWith("Échéancier généré") || it.startsWith("Erreur")) {
+            if (it.startsWith("Échéancier généré") || it.startsWith("Importation réussie") || it.startsWith("Erreur")) {
                 detailViewModel.clearImportStatus()
             }
         }
@@ -148,7 +156,6 @@ fun CreditAccountScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            // L'icône + sert maintenant de bouton de configuration
                             IconButton(onClick = { showSetupDialog = true }) {
                                 Icon(Icons.Default.Add, contentDescription = "Configurer")
                             }
@@ -194,15 +201,39 @@ fun CreditAccountScreen(
                     }
                 }
 
+                // Boutons d'importation (Toujours visibles pour permettre la correction)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = { showSetupDialog = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Manuel")
+                    }
+                    
+                    Button(
+                        onClick = { pdfLauncher.launch("application/pdf") },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("PDF")
+                    }
+                }
+
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 // Liste des mensualités (Échéancier)
-                // Échéancier : Tri chronologique (croissant) par la date complète
-                val sortedTxs = transactions.sortedBy { it.date }
+                val sortedTxs = remember(transactions) { transactions.sortedBy { it.date } }
 
                 if (sortedTxs.isEmpty()) {
                     Text(
-                        text = "Aucune mensualité importée. Utilisez le bouton + sur la fiche de prêt pour configurer votre crédit.",
+                        text = "Aucune mensualité importée. Utilisez les boutons ci-dessus pour configurer votre crédit.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -268,13 +299,33 @@ fun CreditAccountScreen(
         }
     }
 
+    if (pdfRows.isNotEmpty()) {
+        PdfColumnPickerSheet(
+            rows = pdfRows,
+            onDismiss = { detailViewModel.clearPdfData() },
+            onConfirm = { dateIdx, amountIdx, capitalIdx ->
+                detailViewModel.importFromSelectedColumns(
+                    accountId = account.id,
+                    linkedAccountId = account.linkedAccountId,
+                    dateIdx = dateIdx,
+                    amountIdx = amountIdx,
+                    capitalIdx = capitalIdx
+                )
+            }
+        )
+    }
+
     if (showSetupDialog) {
-        // Pré-remplissage avec les données actuelles
+        // Pré-remplissage avec les données actuelles avec protection
         var firstInstallmentDate by remember { 
             mutableStateOf(
-                if (account.loanStartDate != null) 
-                    SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).parse(account.loanStartDate) ?: Date()
-                else Date()
+                try {
+                    if (account.loanStartDate != null) 
+                        SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).parse(account.loanStartDate) ?: Date()
+                    else Date()
+                } catch (e: Exception) {
+                    Date()
+                }
             ) 
         }
         var monthlyPayment by remember { mutableStateOf(account.loanMonthlyPayment?.toString() ?: "") }
