@@ -316,14 +316,23 @@ class MainViewModel : ViewModel() {
             
             val debtsMap = accounts.filter { it.type == "CREDIT" }.associate { account ->
                 val txs = accountTransactionsMap[account.id] ?: emptyList()
-                val initialCapital = account.totalAmount ?: 0.0
                 val now = Calendar.getInstance().timeInMillis
                 
-                val totalPrincipalRepaid = txs.filter { 
-                    it.type == "INCOME" && it.date.toDate().time <= now 
-                }.sumOf { it.principalPart ?: 0.0 }
+                // On cherche toutes les transactions passées
+                val pastTxs = txs.filter { it.type == "INCOME" && it.date.toDate().time <= now }
                 
-                account.id to (initialCapital - totalPrincipalRepaid)
+                // On prend la plus récente pour avoir le capital restant dû exact du PDF
+                val lastTx = pastTxs.minByOrNull { now - it.date.toDate().time }
+                
+                val remainingValue = if (lastTx?.remainingDebt != null) {
+                    lastTx.remainingDebt
+                } else {
+                    val initialCapital = account.totalAmount ?: 0.0
+                    val totalPrincipalRepaid = pastTxs.sumOf { it.principalPart ?: 0.0 }
+                    initialCapital - totalPrincipalRepaid
+                }
+                
+                account.id to (remainingValue ?: 0.0)
             }
 
             withContext(Dispatchers.Main) {

@@ -634,6 +634,7 @@ class AccountDetailViewModel : ViewModel() {
                         principalPart = principalRepaid,
                         interestPart = interestPart,
                         insurancePart = insurance,
+                        remainingDebt = remainingCapital - principalRepaid, // On stocke la dette restante
                         transferGroupId = currentGroupId,
                         targetAccountId = account.linkedAccountId
                     )
@@ -685,13 +686,13 @@ class AccountDetailViewModel : ViewModel() {
     fun extractPdfData(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                _importStatus.value = "Analyse spatiale du PDF..."
+                _importStatus.value = "Analyse spatiale de tout le document..."
                 val extractor = PdfTableExtractor(context)
                 val rows = withContext(Dispatchers.IO) {
                     extractor.extractTableData(uri)
                 }
                 _pdfRows.value = rows
-                _importStatus.value = if (rows.isNotEmpty()) "PDF analysé. Sélectionnez vos colonnes." else "Erreur : Document vide"
+                _importStatus.value = if (rows.isNotEmpty()) "Analyse terminée (${rows.size} lignes). Sélectionnez le début." else "Erreur : Document vide"
             } catch (e: Exception) {
                 _importStatus.value = "Erreur lecture PDF : ${e.localizedMessage}"
             }
@@ -703,9 +704,13 @@ class AccountDetailViewModel : ViewModel() {
     fun importFromSelectedColumns(
         accountId: String,
         linkedAccountId: String?,
-        dateIdx: Int,
-        amountIdx: Int,
-        capitalIdx: Int
+        startRowIdx: Int,
+        dateColIdx: Int,
+        amountColIdx: Int,
+        principalColIdx: Int,
+        interestColIdx: Int,
+        insuranceColIdx: Int,
+        remainingDebtColIdx: Int
     ) {
         val rows = _pdfRows.value
         if (rows.isEmpty()) return
@@ -732,14 +737,15 @@ class AccountDetailViewModel : ViewModel() {
                 var importedCount = 0
                 var firstDate: Date? = null
                 var lastDate: Date? = null
-                var totalAmountFromPdf = 0.0
 
-                rows.forEachIndexed { rowIndex, pdfRow ->
-                    val dateCell = pdfRow.cells.getOrNull(dateIdx)
-                    val amountCell = pdfRow.cells.getOrNull(amountIdx)
-                    val capitalCell = if (capitalIdx != -1) pdfRow.cells.getOrNull(capitalIdx) else null
+                rows.drop(startRowIdx).forEachIndexed { index, pdfRow ->
+                    val dateCell = pdfRow.cells.find { it.colIndex == dateColIdx }
+                    val amountCell = pdfRow.cells.find { it.colIndex == amountColIdx }
+                    val principalCell = pdfRow.cells.find { it.colIndex == principalColIdx }
+                    val interestCell = pdfRow.cells.find { it.colIndex == interestColIdx }
+                    val insuranceCell = pdfRow.cells.find { it.colIndex == insuranceColIdx }
+                    val debtCell = pdfRow.cells.find { it.colIndex == remainingDebtColIdx }
 
-                    // On tente de parser la date pour valider que c'est une ligne de données
                     val date = try { dateCell?.text?.let { dateFormat.parse(it) } } catch (e: Exception) { null }
                     val amount = amountCell?.text?.cleanAmount() ?: 0.0
 
@@ -748,9 +754,8 @@ class AccountDetailViewModel : ViewModel() {
                         if (firstDate == null) firstDate = date
                         lastDate = date
 
-                        val currentGroupId = "${transferGroupIdPrefix}${rowIndex}"
+                        val currentGroupId = "${transferGroupIdPrefix}${index}"
                         
-                        // 1. Crédit (Remboursement)
                         val creditTx = Transaction(
                             title = "Échéance prêt (Import PDF)",
                             amount = amount,
@@ -759,13 +764,15 @@ class AccountDetailViewModel : ViewModel() {
                             subCategory = "Amortissement",
                             date = timestamp,
                             checkedMonths = emptyList(),
-                            principalPart = capitalCell?.text?.cleanAmount() ?: 0.0, // On utilise la colonne capital si dispo
+                            principalPart = principalCell?.text?.cleanAmount(),
+                            interestPart = interestCell?.text?.cleanAmount(),
+                            insurancePart = insuranceCell?.text?.cleanAmount(),
+                            remainingDebt = debtCell?.text?.cleanAmount(),
                             transferGroupId = currentGroupId,
                             targetAccountId = linkedAccountId
                         )
                         batch.set(transactionsRef.document(), creditTx)
 
-                        // 2. Débit (Compte lié) - Uniquement futur
                         if (linkedAccountId != null && !date.before(currentMonthStart.time)) {
                             val debitTx = Transaction(
                                 title = "Prélèvement prêt (Import PDF)",
@@ -780,16 +787,14 @@ class AccountDetailViewModel : ViewModel() {
                             )
                             batch.set(db.collection("accounts").document(linkedAccountId).collection("transactions").document(), debitTx)
                         }
-                        
                         importedCount++
                     }
                 }
 
                 if (importedCount > 0) {
-                    // Mettre à jour l'en-tête du compte
                     val updates = mutableMapOf<String, Any?>()
-                    firstDate?.let { updates["loanStartDate"] = dateFormat.format(it) }
-                    lastDate?.let { updates["loanEndDate"] = dateFormat.format(it) }
+                    if (firstDate != null) updates["loanStartDate"] = dateFormat.format(firstDate)
+                    if (lastDate != null) updates["loanEndDate"] = dateFormat.format(lastDate)
                     db.collection("accounts").document(accountId).update(updates).await()
 
                     batch.commit().await()

@@ -37,7 +37,8 @@ data class Transaction(
     // --- DÉTAILS CRÉDIT ---
     val principalPart: Double? = null,      // Part de capital remboursé
     val interestPart: Double? = null,       // Part d'intérêts payés
-    val insurancePart: Double? = null       // Part d'assurance payée
+    val insurancePart: Double? = null,      // Part d'assurance payée
+    val remainingDebt: Double? = null       // Capital restant dû après cette mensualité
 ) {
     /**
      * Vérifie si l'opération est pointée pour un mois donné (ex: "2026-08")

@@ -275,7 +275,7 @@ fun CreditAccountScreen(
                                     // Détail de la répartition
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text("Principal", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
@@ -288,6 +288,12 @@ fun CreditAccountScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text("Assurance", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                                             Text("%.2f €".format(tx.insurancePart ?: 0.0), style = MaterialTheme.typography.bodySmall, color = Color(0xFF1976D2))
+                                        }
+                                        if (tx.remainingDebt != null) {
+                                            Column(modifier = Modifier.weight(1.2f), horizontalAlignment = Alignment.End) {
+                                                Text("Restant dû", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                                Text("%.2f €".format(tx.remainingDebt), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -303,13 +309,17 @@ fun CreditAccountScreen(
         PdfColumnPickerSheet(
             rows = pdfRows,
             onDismiss = { detailViewModel.clearPdfData() },
-            onConfirm = { dateIdx, amountIdx, capitalIdx ->
+            onConfirm = { startRowIdx, dateColIdx, amountColIdx, principalColIdx, interestColIdx, insuranceColIdx, remainingDebtColIdx ->
                 detailViewModel.importFromSelectedColumns(
                     accountId = account.id,
                     linkedAccountId = account.linkedAccountId,
-                    dateIdx = dateIdx,
-                    amountIdx = amountIdx,
-                    capitalIdx = capitalIdx
+                    startRowIdx = startRowIdx,
+                    dateColIdx = dateColIdx,
+                    amountColIdx = amountColIdx,
+                    principalColIdx = principalColIdx,
+                    interestColIdx = interestColIdx,
+                    insuranceColIdx = insuranceColIdx,
+                    remainingDebtColIdx = remainingDebtColIdx
                 )
             }
         )
@@ -365,7 +375,13 @@ fun CreditAccountScreen(
                         Text("1ère échéance : ${dateFormat.format(firstInstallmentDate)}")
                     }
 
-                    OutlinedTextField(value = totalCapital, onValueChange = { totalCapital = it }, label = { Text("Capital emprunté (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(
+                        value = totalCapital, 
+                        onValueChange = { totalCapital = it }, 
+                        label = { Text("Capital Emprunté (€)") }, // Plus clair
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(value = monthlyPayment, onValueChange = { monthlyPayment = it }, label = { Text("Mensualité (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
