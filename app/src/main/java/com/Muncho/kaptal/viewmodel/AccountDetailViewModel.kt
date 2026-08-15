@@ -582,9 +582,17 @@ class AccountDetailViewModel : ViewModel() {
                 val batch = db.batch()
                 val totalMonthly = monthlyPayment + insurance
                 val transferGroupIdPrefix = "LOAN_${account.id}_"
+                
+                var remainingCapital = totalCapital
+                val monthlyRate = (rate / 100.0) / 12.0
 
                 for (i in 0 until durationMonths) {
-                    // On force le jour de prélèvement choisi tout en gérant les mois courts (ex: 31 février)
+                    // Calcul des intérêts sur le capital restant
+                    val interestPart = if (monthlyRate > 0) remainingCapital * monthlyRate else 0.0
+                    // Le principal remboursé est la mensualité (hors assurance) moins les intérêts
+                    val principalRepaid = monthlyPayment - interestPart
+                    
+                    // On force le jour de prélèvement choisi tout en gérant les mois courts
                     val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
                     cal.set(Calendar.DAY_OF_MONTH, minOf(withdrawalDay, maxDay))
                     
@@ -600,12 +608,17 @@ class AccountDetailViewModel : ViewModel() {
                         subCategory = "Amortissement",
                         date = date,
                         checkedMonths = emptyList(),
-                        principalPart = totalMonthly - insurance,
+                        principalPart = principalRepaid,
+                        interestPart = interestPart,
                         insurancePart = insurance,
                         transferGroupId = currentGroupId,
                         targetAccountId = account.linkedAccountId
                     )
                     batch.set(transactionsRef.document(), creditTx)
+
+                    // Mise à jour du capital restant pour le mois suivant
+                    remainingCapital -= principalRepaid
+                    if (remainingCapital < 0) remainingCapital = 0.0
 
                     // Transaction sur le compte LIÉ (Débit) - UNIQUEMENT SI >= MOIS EN COURS
                     if (linkedRef != null && !cal.before(currentMonthStart)) {

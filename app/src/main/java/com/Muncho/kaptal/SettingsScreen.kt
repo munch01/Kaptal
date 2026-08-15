@@ -139,280 +139,281 @@ fun SettingsScreen(
                 )
             }
         ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-
-            // ================= 1. PROFIL ET COMPTE =================
-            Text(
-                text = stringResource(R.string.settings_profile_section),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = currentUser?.displayName ?: stringResource(R.string.settings_user_default),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = currentUser?.email ?: stringResource(R.string.settings_email_not_set),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                // ================= 1. PROFIL ET COMPTE =================
+                Text(
+                    text = stringResource(R.string.settings_profile_section),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-                    SettingsClickableItem(
-                        icon = Icons.Default.Email,
-                        title = stringResource(R.string.settings_email_title),
-                        subtitle = currentUser?.email ?: stringResource(R.string.settings_email_subtitle),
-                        onClick = { showEmailDialog = true }
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            // ================= 2. SÉCURITÉ =================
-            Text(
-                text = stringResource(R.string.settings_security_section),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+                ) {
+                    Column {
                         Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Column {
-                                Text(stringResource(R.string.settings_biometric_title), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                Text(stringResource(R.string.settings_biometric_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = currentUser?.displayName ?: stringResource(R.string.settings_user_default),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = currentUser?.email ?: stringResource(R.string.settings_email_not_set),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
 
-                        Switch(
-                            checked = viewModel.isBiometricEnabled,
-                            onCheckedChange = { checked ->
-                                viewModel.updateBiometric(checked)
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                        SettingsClickableItem(
+                            icon = Icons.Default.Email,
+                            title = stringResource(R.string.settings_email_title),
+                            subtitle = currentUser?.email ?: stringResource(R.string.settings_email_subtitle),
+                            onClick = { showEmailDialog = true }
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
+                // ================= 2. SÉCURITÉ =================
+                Text(
+                    text = stringResource(R.string.settings_security_section),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Fingerprint, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Column {
+                                    Text(stringResource(R.string.settings_biometric_title), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                    Text(stringResource(R.string.settings_biometric_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+
+                            Switch(
+                                checked = viewModel.isBiometricEnabled,
+                                onCheckedChange = { checked ->
+                                    viewModel.updateBiometric(checked)
+                                }
+                            )
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                        SettingsClickableItem(
+                            icon = Icons.Default.Lock,
+                            title = stringResource(R.string.settings_password_title),
+                            subtitle = stringResource(R.string.settings_password_subtitle),
+                            onClick = {
+                                viewModel.sendPasswordResetEmail { success, message ->
+                                    Toast.makeText(activity, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+                                }
                             }
                         )
                     }
-
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-                    SettingsClickableItem(
-                        icon = Icons.Default.Lock,
-                        title = stringResource(R.string.settings_password_title),
-                        subtitle = stringResource(R.string.settings_password_subtitle),
-                        onClick = {
-                            viewModel.sendPasswordResetEmail { success, message ->
-                                Toast.makeText(activity, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    )
                 }
-            }
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ================= 3. PRÉFÉRENCES =================
-            Text(
-                text = stringResource(R.string.settings_preferences_section),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+                // ================= 3. PRÉFÉRENCES =================
+                Text(
+                    text = stringResource(R.string.settings_preferences_section),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
-            ) {
-                Column {
-                    SettingsClickableItem(
-                        icon = Icons.Default.CurrencyExchange,
-                        title = stringResource(R.string.settings_currency_title),
-                        subtitle = viewModel.selectedCurrency,
-                        onClick = { showCurrencyDialog = true }
-                    )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+                ) {
+                    Column {
+                        SettingsClickableItem(
+                            icon = Icons.Default.CurrencyExchange,
+                            title = stringResource(R.string.settings_currency_title),
+                            subtitle = viewModel.selectedCurrency,
+                            onClick = { showCurrencyDialog = true }
+                        )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    SettingsClickableItem(
-                        icon = Icons.Default.Language,
-                        title = stringResource(R.string.settings_language_title),
-                        subtitle = viewModel.selectedLanguage,
-                        onClick = { showLanguageDialog = true }
-                    )
+                        SettingsClickableItem(
+                            icon = Icons.Default.Language,
+                            title = stringResource(R.string.settings_language_title),
+                            subtitle = viewModel.selectedLanguage,
+                            onClick = { showLanguageDialog = true }
+                        )
+                    }
                 }
-            }
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ================= 4. DÉVELOPPEMENT & LÉGAL =================
-            Text(
-                text = stringResource(R.string.settings_about_section),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+                // ================= 4. DÉVELOPPEMENT & LÉGAL =================
+                Text(
+                    text = stringResource(R.string.settings_about_section),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
-            ) {
-                Column {
-                    SettingsClickableItem(
-                        icon = Icons.Default.Code,
-                        title = stringResource(R.string.settings_github_title),
-                        subtitle = stringResource(R.string.settings_github_subtitle),
-                        trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+                ) {
+                    Column {
+                        SettingsClickableItem(
+                            icon = Icons.Default.Code,
+                            title = stringResource(R.string.settings_github_title),
+                            subtitle = stringResource(R.string.settings_github_subtitle),
+                            trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                activity.startActivity(intent)
                             }
-                            activity.startActivity(intent)
-                        }
-                    )
+                        )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    SettingsClickableItem(
-                        icon = Icons.Default.Gavel,
-                        title = stringResource(R.string.settings_open_source_title),
-                        subtitle = stringResource(R.string.settings_open_source_subtitle),
-                        trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        SettingsClickableItem(
+                            icon = Icons.Default.Gavel,
+                            title = stringResource(R.string.settings_open_source_title),
+                            subtitle = stringResource(R.string.settings_open_source_subtitle),
+                            trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                activity.startActivity(intent)
                             }
-                            activity.startActivity(intent)
-                        }
-                    )
+                        )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    SettingsClickableItem(
-                        icon = Icons.Default.PrivacyTip,
-                        title = stringResource(R.string.settings_privacy_title),
-                        subtitle = stringResource(R.string.settings_privacy_subtitle),
-                        trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://munch01.github.io/Kaptal/index.md")).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        SettingsClickableItem(
+                            icon = Icons.Default.PrivacyTip,
+                            title = stringResource(R.string.settings_privacy_title),
+                            subtitle = stringResource(R.string.settings_privacy_subtitle),
+                            trailingIcon = Icons.AutoMirrored.Filled.OpenInNew,
+                            onClick = {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://munch01.github.io/Kaptal/index.md")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                activity.startActivity(intent)
                             }
-                            activity.startActivity(intent)
-                        }
-                    )
+                        )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    SettingsClickableItem(
-                        icon = Icons.Default.Info,
-                        title = stringResource(R.string.settings_about_title),
-                        subtitle = stringResource(R.string.settings_version, "1.0.120"),
-                        onClick = { showAboutDialog = true }
-                    )
+                        SettingsClickableItem(
+                            icon = Icons.Default.Info,
+                            title = stringResource(R.string.settings_about_title),
+                            subtitle = stringResource(R.string.settings_version, "1.0.120"),
+                            onClick = { showAboutDialog = true }
+                        )
+                    }
                 }
-            }
 
-            HorizontalDivider()
+                HorizontalDivider()
 
-            // ================= 5. DONNÉES & SAUVEGARDE (RGPD) =================
-            Text(
-                text = stringResource(R.string.section_backup),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+                // ================= 5. DONNÉES & SAUVEGARDE (RGPD) =================
+                Text(
+                    text = stringResource(R.string.section_backup),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
-            ) {
-                Column {
-                    SettingsClickableItem(
-                        icon = Icons.Default.FileDownload,
-                        title = stringResource(R.string.export_csv),
-                        subtitle = "Exporter mes transactions au format Excel",
-                        onClick = {
-                            csvLauncher.launch("Kaptal_Export_${System.currentTimeMillis()}.csv")
-                        }
-                    )
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f))
+                ) {
+                    Column {
+                        SettingsClickableItem(
+                            icon = Icons.Default.FileDownload,
+                            title = stringResource(R.string.export_csv),
+                            subtitle = "Exporter mes transactions au format Excel",
+                            onClick = {
+                                csvLauncher.launch("Kaptal_Export_${System.currentTimeMillis()}.csv")
+                            }
+                        )
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    SettingsClickableItem(
-                        icon = Icons.Default.DataObject,
-                        title = stringResource(R.string.export_json),
-                        subtitle = "Exporter mes données personnelles (Portabilité)",
-                        onClick = {
-                            jsonLauncher.launch("Kaptal_Data_${System.currentTimeMillis()}.json")
-                        }
-                    )
+                        SettingsClickableItem(
+                            icon = Icons.Default.DataObject,
+                            title = stringResource(R.string.export_json),
+                            subtitle = "Exporter mes données personnelles (Portabilité)",
+                            onClick = {
+                                jsonLauncher.launch("Kaptal_Data_${System.currentTimeMillis()}.json")
+                            }
+                        )
+                    }
                 }
-            }
 
-            // ================= 6. DÉCONNEXION & SUPPRESSION =================
-            OutlinedButton(
-                onClick = {
-                    viewModel.signOut()
-                    onBackClick()
-                },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.settings_logout))
-            }
+                // ================= 6. DÉCONNEXION & SUPPRESSION =================
+                OutlinedButton(
+                    onClick = {
+                        viewModel.signOut()
+                        onBackClick()
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_logout))
+                }
 
-            Button(
-                onClick = { showDeleteAccountDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.DeleteForever, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.settings_delete_account))
+                Button(
+                    onClick = { showDeleteAccountDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.DeleteForever, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_delete_account))
+                }
             }
         }
     }
@@ -448,8 +449,11 @@ fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text(stringResource(R.string.cancel_label)) } }
+            confirmButton = {
+                TextButton(onClick = { showCurrencyDialog = false }) {
+                    Text(stringResource(R.string.cancel_label))
+                }
+            }
         )
     }
 
@@ -483,8 +487,11 @@ fun SettingsScreen(
                     }
                 }
             },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(stringResource(R.string.cancel_label)) } }
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.cancel_label))
+                }
+            }
         )
     }
 
@@ -557,8 +564,6 @@ fun SettingsScreen(
         )
     }
 }
-}
-
 
 @Composable
 private fun SettingsClickableItem(

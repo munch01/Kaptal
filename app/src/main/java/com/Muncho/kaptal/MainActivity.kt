@@ -37,6 +37,7 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.firebase.auth.FirebaseAuth
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class MainActivity : FragmentActivity() {
@@ -47,17 +48,7 @@ class MainActivity : FragmentActivity() {
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
-        // On applique la locale au niveau du système de manière plus robuste
-        val locale = when (lang) {
-            "English" -> Locale.ENGLISH
-            "Español" -> Locale("es")
-            else -> Locale.FRENCH
-        }
-        Locale.setDefault(locale)
-        val config = newBase.resources.configuration
-        config.setLocale(locale)
-        val context = newBase.createConfigurationContext(config)
-        super.attachBaseContext(context)
+        super.attachBaseContext(LocaleHelper.setLocale(newBase, lang))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,32 +58,24 @@ class MainActivity : FragmentActivity() {
         appUpdateManager = AppUpdateManagerFactory.create(this)
         checkForUpdates()
 
-        val prefs = getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
-        val lang = prefs.getString("selected_language", "Français") ?: "Français"
-
         setContent {
             CompositionLocalProvider(LocalActivity provides this@MainActivity) {
-                val context = LocalContext.current
-                val localeContext = remember(lang) { LocaleHelper.setLocale(context, lang) }
-                
-                CompositionLocalProvider(LocalContext provides localeContext) {
-                    KaptalTheme {
-                        var showSplash by remember { mutableStateOf(true) }
+                KaptalTheme {
+                    var showSplash by remember { mutableStateOf(true) }
 
-                        LaunchedEffect(Unit) {
-                            delay(1200)
-                            showSplash = false
-                        }
+                    LaunchedEffect(Unit) {
+                        delay(1200)
+                        showSplash = false
+                    }
 
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            color = Color(0xFFE8ECEF)
-                        ) {
-                            if (showSplash) {
-                                SplashContent()
-                            } else {
-                                KaptalApp(activity = this@MainActivity)
-                            }
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color(0xFFE8ECEF)
+                    ) {
+                        if (showSplash) {
+                            SplashContent()
+                        } else {
+                            KaptalApp(activity = this@MainActivity)
                         }
                     }
                 }
@@ -160,6 +143,7 @@ fun KaptalApp(
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         settingsViewModel.languageChangedEvent.collect {
@@ -247,7 +231,20 @@ fun KaptalApp(
                             if (isJoint && !memberEmail.isNullOrBlank()) {
                                 viewModel.addMemberToAccount(accountId, memberEmail) { _, _ -> }
                             }
-                            // Pour les crédits, on reste sur l'accueil ou on pourra naviguer plus tard
+                            
+                            if (type == "CREDIT") {
+                                coroutineScope.launch {
+                                    delay(800)
+                                    val state = viewModel.uiState.value
+                                    if (state is AccountsUiState.Success) {
+                                        val newAcc = state.accounts.find { it.id == accountId }
+                                        if (newAcc != null) {
+                                            viewModel.selectAccount(newAcc)
+                                            navController.navigate("credit_detail")
+                                        }
+                                    }
+                                }
+                            }
                         }
                         navController.popBackStack()
                     }

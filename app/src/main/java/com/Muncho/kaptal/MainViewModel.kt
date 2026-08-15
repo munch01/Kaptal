@@ -315,14 +315,14 @@ class MainViewModel : ViewModel() {
         
         val debtsMap = accounts.filter { it.type == "CREDIT" }.associate { account ->
             val txs = accountTransactionsMap[account.id] ?: emptyList()
-            val totalCapital = account.totalAmount ?: 0.0
+            val initialCapital = account.totalAmount ?: 0.0
             
-            // On somme tous les remboursements (INCOME) dont la date est passée ou aujourd'hui
+            // On somme toutes les parts de CAPITAL (principalPart) déjà remboursées jusqu'à aujourd'hui
             val now = Calendar.getInstance().timeInMillis
-            val paidAmount = txs.filter { it.type == "INCOME" && it.date.toDate().time <= now }
-                               .sumOf { it.amount }
+            val totalPrincipalRepaid = txs.filter { it.type == "INCOME" && it.date.toDate().time <= now }
+                                         .sumOf { it.principalPart ?: 0.0 }
             
-            account.id to (totalCapital - paidAmount)
+            account.id to (initialCapital - totalPrincipalRepaid)
         }
 
         _uiState.value = AccountsUiState.Success(accounts, balancesMap, debtsMap)

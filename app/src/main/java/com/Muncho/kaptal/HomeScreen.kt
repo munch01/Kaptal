@@ -124,17 +124,17 @@ fun HomeScreen(
                     },
                     actions = {
                         IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:3lmunch0@gmail.com")
-                                putExtra(Intent.EXTRA_SUBJECT, "Support Kaptal")
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                data = Uri.parse("mailto:3lmunch0@gmail.com?subject=Support%20Kaptal")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             try {
                                 context.startActivity(intent)
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Aucune application d'e-mail trouvée", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Erreur : aucune appli d'email", Toast.LENGTH_SHORT).show()
                             }
                         }) {
-                            Icon(Icons.Default.Info, contentDescription = "Support Email", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.AlternateEmail, contentDescription = "Support Email", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))
