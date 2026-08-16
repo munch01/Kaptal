@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -137,7 +138,7 @@ fun CreditAccountScreen(
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Info sur le compte lié
+                // 1. FICHE DE PRÊT (CENTRALE)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.8f))
@@ -156,8 +157,16 @@ fun CreditAccountScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            IconButton(onClick = { showSetupDialog = true }) {
-                                Icon(Icons.Default.Add, contentDescription = "Configurer")
+                            
+                            Row {
+                                // Bouton PDF (Importation)
+                                IconButton(onClick = { pdfLauncher.launch("application/pdf") }) {
+                                    Icon(Icons.Default.PictureAsPdf, contentDescription = "Importer PDF", tint = MaterialTheme.colorScheme.secondary)
+                                }
+                                // Bouton + (Saisie Manuelle)
+                                IconButton(onClick = { showSetupDialog = true }) {
+                                    Icon(Icons.Default.Add, contentDescription = "Saisie manuelle", tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
 
@@ -169,60 +178,51 @@ fun CreditAccountScreen(
                             )
                         }
 
-                        // --- AFFICHAGE DES INFOS ---
-                        if (!account.loanStartDate.isNullOrBlank()) {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                            
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("CAPITAL EMPRUNTÉ", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                    Text("%.2f €".format(account.totalAmount ?: 0.0), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                }
-                                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                                    Text("ÉCHÉANCE FINALE", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                    Text("${account.loanEndDate ?: "Inconnue"}", style = MaterialTheme.typography.bodySmall)
-                                }
-                            }
-                            
-                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Column {
-                                    Text("MENSUALITÉ TOTALE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                                    val totalMonthly = (account.loanMonthlyPayment ?: 0.0) + (account.loanInsurance ?: 0.0)
-                                    Text("%.2f € / mois".format(totalMonthly), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                                }
-                                if ((account.loanRate ?: 0.0) > 0) {
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("TAUX (INFO)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                        Text("${account.loanRate}%", style = MaterialTheme.typography.bodySmall)
+                            // --- AFFICHAGE DES INFOS (Si configuré) ---
+                            if (!account.loanStartDate.isNullOrBlank()) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                
+                                // Calculs dynamiques
+                                val now = Calendar.getInstance().timeInMillis
+                                val pastTxs = transactions.filter { it.type == "INCOME" && it.date.toDate().time <= now }
+                                val futureTxs = transactions.filter { it.type == "INCOME" && it.date.toDate().time > now }
+                                
+                                val amountAlreadyPaid = pastTxs.sumOf { it.amount }
+                                val amountRemaining = futureTxs.sumOf { it.amount }
+                                val totalCost = transactions.filter { it.type == "INCOME" }.sumOf { it.amount }
+
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("CAPITAL EMPRUNTÉ", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                        Text("%.2f €".format(account.totalAmount ?: 0.0), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                                        Text("ÉCHÉANCE FINALE", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                        Text("${account.loanEndDate ?: "Inconnue"}", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
-                            }
+                                
+                                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Column {
+                                        Text("MENSUALITÉ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                        val monthly = (account.loanMonthlyPayment ?: 0.0) + (account.loanInsurance ?: 0.0)
+                                        Text("%.2f € / mois".format(monthly), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Text("Déjà payé : %.2f €".format(amountAlreadyPaid), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("TOTAL À REMBOURSER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                        Text("%.2f €".format(totalCost), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                        Text("Restant : %.2f €".format(amountRemaining), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    }
+                                }
+                            } else {
+                            // Message si non configuré
+                            Text(
+                                "Crédit non configuré. Utilisez les icônes ci-dessus pour importer un PDF ou saisir les données manuellement.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
                         }
-                    }
-                }
-
-                // Boutons d'importation (Toujours visibles pour permettre la correction)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = { showSetupDialog = true },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Manuel")
-                    }
-                    
-                    Button(
-                        onClick = { pdfLauncher.launch("application/pdf") },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                    ) {
-                        Icon(Icons.Default.PictureAsPdf, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("PDF")
                     }
                 }
 
@@ -378,10 +378,34 @@ fun CreditAccountScreen(
                     OutlinedTextField(
                         value = totalCapital, 
                         onValueChange = { totalCapital = it }, 
-                        label = { Text("Capital Emprunté (€)") }, // Plus clair
+                        label = { Text("Capital Emprunté (€)") }, 
+                        placeholder = { Text("Ex: 13300") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
                         modifier = Modifier.fillMaxWidth()
                     )
+                    
+                    // Prévisualisation du coût total (Mensualité x Durée)
+                    val mVal = monthlyPayment.replace(",", ".").toDoubleOrNull() ?: 0.0
+                    val dVal = durationMonths.toIntOrNull() ?: 0
+                    if (mVal > 0 && dVal > 0) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Aperçu du coût total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                Text("Coût total : %.2f €".format(mVal * dVal), fontWeight = FontWeight.Bold)
+                                
+                                // Calcul date de fin estimée
+                                val calEnd = Calendar.getInstance().apply {
+                                    time = firstInstallmentDate
+                                    add(Calendar.MONTH, dVal - 1)
+                                }
+                                Text("Fin prévue : ${dateFormat.format(calEnd.time)}", fontSize = 11.sp)
+                            }
+                        }
+                    }
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(value = monthlyPayment, onValueChange = { monthlyPayment = it }, label = { Text("Mensualité (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
@@ -405,7 +429,11 @@ fun CreditAccountScreen(
                     val r = rate.replace(",", ".").toDoubleOrNull() ?: 0.0
                     val wDay = withdrawalDay.toIntOrNull() ?: 5
                     
-                    if (m > 0 && d > 0 && c > 0) {
+                    // Si on a déjà des données (import PDF) et qu'on ajuste juste le capital
+                    if (transactions.isNotEmpty() && m == 0.0 && d == 0) {
+                        detailViewModel.updateLoanMetadata(account.id, c)
+                        showSetupDialog = false
+                    } else if (m > 0 && d > 0 && c > 0) {
                         detailViewModel.generateLoanInstallments(
                             context = context,
                             account = account,
@@ -420,7 +448,8 @@ fun CreditAccountScreen(
                         showSetupDialog = false
                     }
                 }) {
-                    Text("Générer l'échéancier")
+                    val label = if (transactions.isNotEmpty() && monthlyPayment.isEmpty()) "Mettre à jour le capital" else "Générer l'échéancier"
+                    Text(label)
                 }
             },
             dismissButton = {

@@ -22,5 +22,6 @@ data class Account(
     val loanSigningDate: String? = null,
     val loanMonthlyPayment: Double? = null,
     val loanRate: Double? = null,
-    val loanInsurance: Double? = null
+    val loanInsurance: Double? = null,
+    val loanTotalRepayment: Double? = null // Coût total (Mensualité x Durée)
 )

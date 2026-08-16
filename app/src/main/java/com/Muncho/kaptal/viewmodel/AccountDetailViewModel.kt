@@ -213,10 +213,6 @@ class AccountDetailViewModel : ViewModel() {
         }
     }
 
-    /*
-    fun generateInstallments(...) { ... }
-    */
-
     /**
      * Gestion avancée de la modification d'une récurrence selon la portée choisie.
      */
@@ -357,13 +353,13 @@ class AccountDetailViewModel : ViewModel() {
 
                         // 2. Créer l'occurrence isolée modifiée pour ce mois précis (non récurrente)
                         val isolatedTx = Transaction(
-                            title = newTitle,
+                            title = "Libéré du crédit (Modifié)",
                             amount = newAmount,
                             familyCategory = newFamilyCategory,
                             subCategory = newSubCategory,
                             type = newType,
                             paymentMethod = newPaymentMethod,
-                            date = newDate, // Correction : on utilise la date choisie (ex: le 15) au lieu de l'effectiveDate (le 1er)
+                            date = newDate, 
                             isRecurring = false,
                             checkedMonths = emptyList(),
                             transferGroupId = newTransferGroupId,
@@ -577,7 +573,6 @@ class AccountDetailViewModel : ViewModel() {
                 clearExistingLoanData(account.id, account.linkedAccountId)
                 
                 _importStatus.value = "Génération de l'échéancier..."
-                // ... reste du code de génération
                 
                 // 1. Mettre à jour l'en-tête du compte
                 val updates = mutableMapOf<String, Any?>(
@@ -585,8 +580,17 @@ class AccountDetailViewModel : ViewModel() {
                     "loanStartDate" to SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(startDate),
                     "loanMonthlyPayment" to monthlyPayment,
                     "loanInsurance" to insurance,
-                    "loanRate" to rate
+                    "loanRate" to rate,
+                    "loanTotalRepayment" to (monthlyPayment + insurance) * durationMonths
                 )
+                
+                // Calcul de la date de fin
+                val calEnd = Calendar.getInstance().apply { 
+                    time = startDate
+                    add(Calendar.MONTH, durationMonths - 1) 
+                }
+                updates["loanEndDate"] = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(calEnd.time)
+
                 db.collection("accounts").document(account.id).update(updates).await()
 
                 // 2. Préparer les dates
@@ -600,8 +604,6 @@ class AccountDetailViewModel : ViewModel() {
                 }
 
                 val transactionsRef = db.collection("accounts").document(account.id).collection("transactions")
-                val linkedRef = account.linkedAccountId?.let { db.collection("accounts").document(it).collection("transactions") }
-
                 val batch = db.batch()
                 val totalMonthly = monthlyPayment + insurance
                 val transferGroupIdPrefix = "LOAN_${account.id}_"
@@ -610,19 +612,15 @@ class AccountDetailViewModel : ViewModel() {
                 val monthlyRate = (rate / 100.0) / 12.0
 
                 for (i in 0 until durationMonths) {
-                    // Calcul des intérêts sur le capital restant
                     val interestPart = if (monthlyRate > 0) remainingCapital * monthlyRate else 0.0
-                    // Le principal remboursé est la mensualité (hors assurance) moins les intérêts
                     val principalRepaid = monthlyPayment - interestPart
                     
-                    // On force le jour de prélèvement choisi tout en gérant les mois courts
                     val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
                     cal.set(Calendar.DAY_OF_MONTH, minOf(withdrawalDay, maxDay))
                     
                     val date = Timestamp(cal.time)
                     val currentGroupId = "${transferGroupIdPrefix}${i}"
                     
-                    // Transaction sur le compte CREDIT (Remboursement)
                     val creditTx = Transaction(
                         title = "Échéance prêt ${account.name}",
                         amount = totalMonthly,
@@ -634,18 +632,16 @@ class AccountDetailViewModel : ViewModel() {
                         principalPart = principalRepaid,
                         interestPart = interestPart,
                         insurancePart = insurance,
-                        remainingDebt = remainingCapital - principalRepaid, // On stocke la dette restante
+                        remainingDebt = remainingCapital - principalRepaid,
                         transferGroupId = currentGroupId,
                         targetAccountId = account.linkedAccountId
                     )
                     batch.set(transactionsRef.document(), creditTx)
 
-                    // Mise à jour du capital restant pour le mois suivant
                     remainingCapital -= principalRepaid
                     if (remainingCapital < 0) remainingCapital = 0.0
 
-                    // Transaction sur le compte LIÉ (Débit) - UNIQUEMENT SI >= MOIS EN COURS
-                    if (linkedRef != null && !cal.before(currentMonthStart)) {
+                    if (account.linkedAccountId != null && !cal.before(currentMonthStart)) {
                         val debitTx = Transaction(
                             title = "Prélèvement prêt ${account.name}",
                             amount = -totalMonthly,
@@ -657,19 +653,11 @@ class AccountDetailViewModel : ViewModel() {
                             transferGroupId = currentGroupId,
                             targetAccountId = account.id
                         )
-                        val targetId = account.linkedAccountId
-                        if (targetId != null) {
-                            batch.set(db.collection("accounts").document(targetId).collection("transactions").document(), debitTx)
-                        }
+                        batch.set(db.collection("accounts").document(account.linkedAccountId).collection("transactions").document(), debitTx)
                     }
-                    
                     cal.add(Calendar.MONTH, 1)
                 }
                 
-                // Mettre à jour la date de fin
-                cal.add(Calendar.MONTH, -1)
-                db.collection("accounts").document(account.id).update("loanEndDate", SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).format(cal.time)).await()
-
                 batch.commit().await()
                 _importStatus.value = "Échéancier généré : $durationMonths mensualités créées."
                 
@@ -686,13 +674,11 @@ class AccountDetailViewModel : ViewModel() {
     fun extractPdfData(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                _importStatus.value = "Analyse spatiale de tout le document..."
+                _importStatus.value = "Analyse spatiale du document..."
                 val extractor = PdfTableExtractor(context)
-                val rows = withContext(Dispatchers.IO) {
-                    extractor.extractTableData(uri)
-                }
+                val rows = withContext(Dispatchers.IO) { extractor.extractTableData(uri) }
                 _pdfRows.value = rows
-                _importStatus.value = if (rows.isNotEmpty()) "Analyse terminée (${rows.size} lignes). Sélectionnez le début." else "Erreur : Document vide"
+                _importStatus.value = if (rows.isNotEmpty()) "Prêt à identifier les colonnes." else "Erreur : PDF vide"
             } catch (e: Exception) {
                 _importStatus.value = "Erreur lecture PDF : ${e.localizedMessage}"
             }
@@ -720,8 +706,14 @@ class AccountDetailViewModel : ViewModel() {
                 _importStatus.value = "Nettoyage des anciennes données..."
                 clearExistingLoanData(accountId, linkedAccountId)
 
-                _importStatus.value = "Génération de l'échéancier..."
-                val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
+                _importStatus.value = "Importation des lignes..."
+                val dateFormatPatterns = listOf(
+                    SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE),
+                    SimpleDateFormat("dd/MM/yy", Locale.FRANCE),
+                    SimpleDateFormat("d/MM/yyyy", Locale.FRANCE),
+                    SimpleDateFormat("d/MM/yy", Locale.FRANCE)
+                )
+                
                 val currentMonthStart = Calendar.getInstance().apply {
                     set(Calendar.DAY_OF_MONTH, 1)
                     set(Calendar.HOUR_OF_DAY, 0)
@@ -737,19 +729,29 @@ class AccountDetailViewModel : ViewModel() {
                 var importedCount = 0
                 var firstDate: Date? = null
                 var lastDate: Date? = null
+                val amountValues = mutableListOf<Double>()
 
                 rows.drop(startRowIdx).forEachIndexed { index, pdfRow ->
                     val dateCell = pdfRow.cells.find { it.colIndex == dateColIdx }
                     val amountCell = pdfRow.cells.find { it.colIndex == amountColIdx }
-                    val principalCell = pdfRow.cells.find { it.colIndex == principalColIdx }
-                    val interestCell = pdfRow.cells.find { it.colIndex == interestColIdx }
-                    val insuranceCell = pdfRow.cells.find { it.colIndex == insuranceColIdx }
-                    val debtCell = pdfRow.cells.find { it.colIndex == remainingDebtColIdx }
+                    val principalCell = if (principalColIdx != -1) pdfRow.cells.find { it.colIndex == principalColIdx } else null
+                    val interestCell = if (interestColIdx != -1) pdfRow.cells.find { it.colIndex == interestColIdx } else null
+                    val insuranceCell = if (insuranceColIdx != -1) pdfRow.cells.find { it.colIndex == insuranceColIdx } else null
+                    val debtCell = if (remainingDebtColIdx != -1) pdfRow.cells.find { it.colIndex == remainingDebtColIdx } else null
 
-                    val date = try { dateCell?.text?.let { dateFormat.parse(it) } } catch (e: Exception) { null }
+                    var date: Date? = null
+                    val rawDateText = dateCell?.text?.trim() ?: ""
+                    for (pattern in dateFormatPatterns) {
+                        try {
+                            date = pattern.parse(rawDateText)
+                            if (date != null) break
+                        } catch (e: Exception) {}
+                    }
+                    
                     val amount = amountCell?.text?.cleanAmount() ?: 0.0
 
                     if (date != null && amount > 0) {
+                        amountValues.add(amount)
                         val timestamp = Timestamp(date)
                         if (firstDate == null) firstDate = date
                         lastDate = date
@@ -793,27 +795,49 @@ class AccountDetailViewModel : ViewModel() {
 
                 if (importedCount > 0) {
                     val updates = mutableMapOf<String, Any?>()
-                    if (firstDate != null) updates["loanStartDate"] = dateFormat.format(firstDate)
-                    if (lastDate != null) updates["loanEndDate"] = dateFormat.format(lastDate)
+                    val outputFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
+                    if (firstDate != null) updates["loanStartDate"] = outputFormat.format(firstDate!!)
+                    if (lastDate != null) updates["loanEndDate"] = outputFormat.format(lastDate!!)
+                    
+                    // Somme réelle de toutes les mensualités lues
+                    val totalRepayment = amountValues.sum()
+                    val commonAmount = amountValues.groupBy { it }.maxByOrNull { it.value.size }?.key
+                    
+                    if (commonAmount != null) {
+                        updates["loanMonthlyPayment"] = commonAmount
+                    }
+                    updates["loanTotalRepayment"] = totalRepayment
+                    
                     db.collection("accounts").document(accountId).update(updates).await()
-
                     batch.commit().await()
-                    _importStatus.value = "Importation réussie : $importedCount mensualités créées."
-                } else {
-                    _importStatus.value = "Erreur : Aucune donnée valide trouvée dans les colonnes choisies."
+                    _importStatus.value = "Importation réussie : $importedCount mensualités."
                 }
-                
+else {
+                    _importStatus.value = "Erreur : Aucune donnée valide trouvée."
+                }
                 clearPdfData()
-
             } catch (e: Exception) {
-                Log.e("PDF_IMPORT", "Erreur import colonnes", e)
-                _importStatus.value = "Erreur lors de l'import : ${e.localizedMessage}"
+                _importStatus.value = "Erreur import : ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun updateLoanMetadata(accountId: String, totalCapital: Double) {
+        viewModelScope.launch {
+            try {
+                db.collection("accounts").document(accountId)
+                    .update("totalAmount", totalCapital)
+                    .await()
+                _importStatus.value = "Capital emprunté mis à jour."
+            } catch (e: Exception) {
+                _importStatus.value = "Erreur mise à jour : ${e.localizedMessage}"
             }
         }
     }
 
     private fun String.cleanAmount(): Double {
-        return this.replace(" ", "").replace(",", ".").replace("€", "").toDoubleOrNull() ?: 0.0
+        val cleaned = this.replace(Regex("[^0-9,.-]"), "").replace(",", ".")
+        return cleaned.toDoubleOrNull() ?: 0.0
     }
 
     override fun onCleared() {

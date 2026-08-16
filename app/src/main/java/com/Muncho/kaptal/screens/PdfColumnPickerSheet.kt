@@ -95,7 +95,8 @@ fun PdfColumnPickerSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             Box(modifier = Modifier.weight(1f).border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(12.dp))) {
-                val visibleRows = if (currentStep == 2) rows.drop(startRowIndex).take(60) else rows.take(100)
+                // VISIBILITÉ TOTALE : On montre tout pour que l'utilisateur puisse vérifier page 2
+                val visibleRows = if (currentStep == 2) rows.drop(startRowIndex) else rows
                 val maxCols = visibleRows.flatMap { it.cells }.maxOfOrNull { it.colIndex } ?: 5
                 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
