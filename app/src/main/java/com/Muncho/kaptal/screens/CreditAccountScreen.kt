@@ -13,9 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -362,6 +361,24 @@ fun CreditAccountScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    if (transactions.isNotEmpty()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    "Attention : Modifier les mensualités supprimera vos données PDF. Pour ajuster seulement le capital, utilisez 'Sauver Capital'.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedButton(
                         onClick = {
                             val activity = context.findActivity() ?: return@OutlinedButton
@@ -421,35 +438,58 @@ fun CreditAccountScreen(
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val m = monthlyPayment.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    val d = durationMonths.toIntOrNull() ?: 0
-                    val c = totalCapital.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    val i = insurance.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    val r = rate.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    val wDay = withdrawalDay.toIntOrNull() ?: 5
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val cVal = totalCapital.replace(",", ".").toDoubleOrNull() ?: 0.0
                     
-                    // Si on a déjà des données (import PDF) et qu'on ajuste juste le capital
-                    if (transactions.isNotEmpty() && m == 0.0 && d == 0) {
-                        detailViewModel.updateLoanMetadata(account.id, c)
-                        showSetupDialog = false
-                    } else if (m > 0 && d > 0 && c > 0) {
-                        detailViewModel.generateLoanInstallments(
-                            context = context,
-                            account = account,
-                            startDate = firstInstallmentDate,
-                            monthlyPayment = m,
-                            durationMonths = d,
-                            totalCapital = c,
-                            insurance = i,
-                            rate = r,
-                            withdrawalDay = wDay
-                        )
-                        showSetupDialog = false
+                    // 1. BOUTON : Uniquement mettre à jour le capital (Ne touche pas aux transactions)
+                    if (transactions.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                if (cVal > 0) {
+                                    detailViewModel.updateLoanMetadata(account.id, cVal)
+                                    showSetupDialog = false
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Sauver Capital", textAlign = TextAlign.Center)
+                        }
                     }
-                }) {
-                    val label = if (transactions.isNotEmpty() && monthlyPayment.isEmpty()) "Mettre à jour le capital" else "Générer l'échéancier"
-                    Text(label)
+
+                    // 2. BOUTON : Tout régénérer (Écrase tout)
+                    Button(
+                        onClick = {
+                            val m = monthlyPayment.replace(",", ".").toDoubleOrNull() ?: 0.0
+                            val d = durationMonths.toIntOrNull() ?: 0
+                            val i = insurance.replace(",", ".").toDoubleOrNull() ?: 0.0
+                            val r = rate.replace(",", ".").toDoubleOrNull() ?: 0.0
+                            val wDay = withdrawalDay.toIntOrNull() ?: 5
+                            
+                            if (m > 0 && d > 0 && cVal > 0) {
+                                detailViewModel.generateLoanInstallments(
+                                    context = context,
+                                    account = account,
+                                    startDate = firstInstallmentDate,
+                                    monthlyPayment = m,
+                                    durationMonths = d,
+                                    totalCapital = cVal,
+                                    insurance = i,
+                                    rate = r,
+                                    withdrawalDay = wDay
+                                )
+                                showSetupDialog = false
+                            }
+                        },
+                        colors = if (transactions.isNotEmpty()) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) 
+                                 else ButtonDefaults.buttonColors(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (transactions.isNotEmpty()) "Régénérer" else "Générer", textAlign = TextAlign.Center)
+                    }
                 }
             },
             dismissButton = {

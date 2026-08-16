@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.Muncho.kaptal"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.Muncho.kaptal"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 2
         versionName = project.findProperty("versionName")?.toString() ?: "1.0.1"
 
