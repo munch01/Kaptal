@@ -43,13 +43,14 @@ fun CryptoScreen(
     val cryptoRates by mainViewModel.cryptoRates.collectAsState()
     val cryptoHistory by mainViewModel.cryptoHistory.collectAsState()
 
-    LaunchedEffect(account.id) {
+    val symbol = account.cryptoSymbol ?: "BTC"
+
+    LaunchedEffect(account.id, symbol) {
         detailViewModel.loadTransactions(account.id)
-        // On récupère l'historique (par défaut BTC ici)
-        mainViewModel.fetchCryptoHistory("BTC")
+        mainViewModel.fetchCryptoHistory(symbol)
     }
 
-    val currentRate = cryptoRates["BTC"] ?: 0.0
+    val currentRate = cryptoRates[symbol] ?: 0.0
     val totalInvested = remember(transactions) { mainViewModel.calculateTotalInvestment(transactions) }
     
     // Performance calculée en direct sur le taux actuel
@@ -62,10 +63,16 @@ fun CryptoScreen(
     val gainLossPoints = remember(transactions, cryptoHistory) {
         if (cryptoHistory.isEmpty()) return@remember emptyList<Float>()
         cryptoHistory.map { (timestamp, price) ->
+            // On calcule la quantité et le coût cumulés à cette date précise
             val txsBefore = transactions.filter { it.date.toDate().time <= timestamp }
             val qtyAtPoint = txsBefore.sumOf { it.amount }
-            val costAtPoint = txsBefore.sumOf { it.investmentEur ?: it.amount }
-            val valueAtPoint = qtyAtPoint * price
+            // Correction : on utilise la quantité initiale si c'est la seule donnée
+            val initialQty = if (transactions.isEmpty()) account.initialBalance else 0.0
+            
+            val totalQty = qtyAtPoint + initialQty
+            val costAtPoint = txsBefore.sumOf { it.investmentEur ?: (it.amount * price) } // Estimation si coût non saisi
+            
+            val valueAtPoint = totalQty * price
             (valueAtPoint - costAtPoint).toFloat()
         }
     }
@@ -197,6 +204,13 @@ fun CryptoScreen(
 
 @Composable
 fun RealPerformanceCurve(points: List<Float>) {
+    if (points.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Chargement de l'historique...", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        return
+    }
+
     Canvas(modifier = Modifier.fillMaxSize()) {
         if (points.size < 2) return@Canvas
         
@@ -205,18 +219,21 @@ fun RealPerformanceCurve(points: List<Float>) {
         val minVal = points.minOrNull() ?: 0f
         val maxVal = points.maxOrNull() ?: 0f
         
-        val absoluteMax = maxOf(Math.abs(minVal), Math.abs(maxVal), 50f)
+        // On définit l'échelle pour que 0€ soit bien visible et centré
+        val absoluteMax = maxOf(Math.abs(minVal), Math.abs(maxVal), 10f)
         
         fun getY(value: Float): Float {
-            return height / 2f - (value / absoluteMax) * (height / 2f)
+            // Le centre (height/2) représente 0€ de profit/perte
+            return height / 2f - (value / absoluteMax) * (height * 0.4f)
         }
 
         // Ligne de rentabilité (0€)
         drawLine(
-            color = Color.LightGray.copy(alpha = 0.5f),
+            color = Color.Gray.copy(alpha = 0.3f),
             start = androidx.compose.ui.geometry.Offset(0f, height / 2f),
             end = androidx.compose.ui.geometry.Offset(width, height / 2f),
-            strokeWidth = 1.dp.toPx()
+            strokeWidth = 1.dp.toPx(),
+            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
         )
 
         val path = Path()
@@ -235,6 +252,13 @@ fun RealPerformanceCurve(points: List<Float>) {
             path = path,
             color = curveColor,
             style = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        )
+        
+        // Point final
+        drawCircle(
+            color = curveColor,
+            radius = 4.dp.toPx(),
+            center = androidx.compose.ui.geometry.Offset(width, getY(lastVal))
         )
     }
 }

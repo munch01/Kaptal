@@ -220,7 +220,7 @@ fun KaptalApp(
                     onBackClick = { navController.popBackStack() },
                     viewModel = viewModel,
                     initialTypeKey = typeKey,
-                    onAccountAdded = { name, bank, balance, type, isJoint, color, linkedId, memberEmail ->
+                    onAccountAdded = { name, bank, balance, type, isJoint, color, linkedId, memberEmail, cryptoSymbol ->
                         viewModel.addAccount(
                             name = name,
                             bankName = bank,
@@ -228,7 +228,8 @@ fun KaptalApp(
                             type = type,
                             isJoint = isJoint,
                             color = color,
-                            linkedAccountId = linkedId
+                            linkedAccountId = linkedId,
+                            cryptoSymbol = cryptoSymbol
                         ) { accountId ->
                             if (isJoint && !memberEmail.isNullOrBlank()) {
                                 viewModel.addMemberToAccount(accountId, memberEmail) { _, _ -> }

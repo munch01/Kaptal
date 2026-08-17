@@ -37,7 +37,8 @@ fun AddAccountScreen(
         isJoint: Boolean,
         color: String,
         linkedAccountId: String?,
-        memberEmail: String?
+        memberEmail: String?,
+        cryptoSymbol: String? // Nouveau paramètre
     ) -> Unit
 ) {
     var accountName by remember { mutableStateOf("") }
@@ -85,6 +86,7 @@ fun AddAccountScreen(
     var memberEmail by remember { mutableStateOf("") }
     var linkedAccountId by remember { mutableStateOf<String?>(null) }
     var expandedLinkedAccount by remember { mutableStateOf(false) }
+    var cryptoSymbol by remember { mutableStateOf("") }
 
     val availableColors = listOf(
         "#2196F3", "#4CAF50", "#FF9800", "#E91E63", "#9C27B0",
@@ -125,10 +127,22 @@ fun AddAccountScreen(
             OutlinedTextField(
                 value = bankName,
                 onValueChange = { bankName = it },
-                label = { Text(stringResource(R.string.account_bank_label)) },
+                label = { Text(if (selectedTypeKey == "CRYPTO") "Plateforme (ex: Binance)" else stringResource(R.string.account_bank_label)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            // --- SYMBOLE CRYPTO ---
+            if (selectedTypeKey == "CRYPTO") {
+                OutlinedTextField(
+                    value = cryptoSymbol,
+                    onValueChange = { cryptoSymbol = it.uppercase().trim() },
+                    label = { Text("Symbole (ex: BTC, ETH)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("BTC") }
+                )
+            }
 
             // Type de compte (Tuiles) - Masqué si un seul type possible
             if (filteredTypes.size > 1) {
@@ -246,7 +260,8 @@ fun AddAccountScreen(
                             isJoint,
                             selectedColor,
                             linkedAccountId,
-                            if (isJoint) memberEmail.trim() else null
+                            if (isJoint) memberEmail.trim() else null,
+                            if (selectedTypeKey == "CRYPTO") cryptoSymbol else null
                         )
                     }
                 },

@@ -23,5 +23,6 @@ data class Account(
     val loanMonthlyPayment: Double? = null,
     val loanRate: Double? = null,
     val loanInsurance: Double? = null,
-    val loanTotalRepayment: Double? = null // Coût total (Mensualité x Durée)
+    val loanTotalRepayment: Double? = null, // Coût total (Mensualité x Durée)
+    val cryptoSymbol: String? = null       // Ex: BTC, ETH, SOL
 )

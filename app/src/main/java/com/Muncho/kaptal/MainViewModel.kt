@@ -432,6 +432,7 @@ class MainViewModel : ViewModel() {
         isJoint: Boolean,
         color: String,
         linkedAccountId: String? = null,
+        cryptoSymbol: String? = null,
         onAccountCreated: (String) -> Unit = {}
     ) {
         val currentUser = auth.currentUser ?: return
@@ -453,7 +454,8 @@ class MainViewModel : ViewModel() {
                     order = nextOrder,
                     members = membersList,
                     ownerId = currentUser.uid,
-                    linkedAccountId = linkedAccountId
+                    linkedAccountId = linkedAccountId,
+                    cryptoSymbol = cryptoSymbol
                 )
 
                 newAccountRef.set(account).await()
@@ -471,6 +473,7 @@ class MainViewModel : ViewModel() {
         isJoint: Boolean,
         color: String,
         linkedAccountId: String? = null,
+        cryptoSymbol: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -482,7 +485,8 @@ class MainViewModel : ViewModel() {
                     "type" to type,
                     "isJoint" to isJoint,
                     "color" to color,
-                    "linkedAccountId" to linkedAccountId
+                    "linkedAccountId" to linkedAccountId,
+                    "cryptoSymbol" to cryptoSymbol
                 )
                 firestore.collection("accounts").document(accountId).update(updates).await()
                 onSuccess()
