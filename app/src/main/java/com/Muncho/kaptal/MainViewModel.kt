@@ -605,6 +605,23 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    fun calculateTotalInvestment(transactions: List<Transaction>): Double {
+        // Un apport crypto utilise soit investmentEur (si renseigné) soit le montant direct (ancien système)
+        return transactions.filter { it.type == "INCOME" || (it.type == "TRANSFER" && it.amount > 0) }
+            .sumOf { it.investmentEur ?: it.amount }
+    }
+
+    fun calculatePortfolioPerformance(account: Account, transactions: List<Transaction>, currentRate: Double): Pair<Double, Double> {
+        val totalInvested = calculateTotalInvestment(transactions)
+        val currentQuantity = calculateCurrentRealBalance(account, transactions)
+        val currentValue = currentQuantity * currentRate
+        
+        val gainLoss = currentValue - totalInvested
+        val percentage = if (totalInvested > 0) (gainLoss / totalInvested) * 100 else 0.0
+        
+        return Pair(gainLoss, percentage)
+    }
+
     override fun onCleared() {
         super.onCleared()
         auth.removeAuthStateListener(authStateListener)

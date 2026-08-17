@@ -4,6 +4,10 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,8 +21,8 @@ import com.Muncho.kaptal.LocalActivity
 import com.Muncho.kaptal.R
 import com.Muncho.kaptal.findActivity
 import com.Muncho.kaptal.model.Account
+import com.Muncho.kaptal.model.CategoryFamily
 import com.Muncho.kaptal.model.Transaction
-import com.Muncho.kaptal.model.transactionCategories
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*
@@ -30,13 +34,30 @@ fun AddTransactionBottomSheet(
     initialTransaction: Transaction? = null,
     accounts: List<Account> = emptyList(),
     currentAccountId: String = "",
+    categories: List<CategoryFamily> = emptyList(),
     onDismiss: () -> Unit,
-    onSave: (title: String, amount: Double, familyCategory: String, subCategory: String, type: String, paymentMethod: String, date: Timestamp, isRecurring: Boolean, recurrenceInterval: String?, endDate: Timestamp?, targetAccountId: String?) -> Unit
+    onSave: (
+        title: String,
+        amount: Double,
+        familyCategory: String,
+        subCategory: String,
+        type: String,
+        paymentMethod: String,
+        date: Timestamp,
+        isRecurring: Boolean,
+        recurrenceInterval: String?,
+        endDate: Timestamp?,
+        sourceAccountId: String,
+        targetAccountId: String?,
+        investmentEur: Double? // Nouveau paramètre
+    ) -> Unit
 ) {
     var title by remember { mutableStateOf(initialTransaction?.title ?: "") }
 
     val initialAbsAmount = initialTransaction?.amount?.let { if (it < 0) -it else it }
     var amountText by remember { mutableStateOf(initialAbsAmount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
+    
+    var investmentEurText by remember { mutableStateOf(initialTransaction?.investmentEur?.toString() ?: "") }
 
     var type by remember { mutableStateOf(initialTransaction?.type ?: "EXPENSE") }
 
@@ -50,14 +71,14 @@ fun AddTransactionBottomSheet(
     var familyCategory by remember {
         mutableStateOf(
             if (initialTransaction?.type == "INCOME") "Recettes"
-            else initialTransaction?.familyCategory?.takeIf { it.isNotBlank() } ?: transactionCategories.first().name
+            else initialTransaction?.familyCategory?.takeIf { it.isNotBlank() } ?: categories.firstOrNull()?.name ?: ""
         )
     }
 
     var subCategory by remember {
         mutableStateOf(
             if (initialTransaction?.type == "INCOME") initialTransaction.subCategory?.takeIf { it.isNotBlank() } ?: incomeCategories.first()
-            else initialTransaction?.subCategory?.takeIf { it.isNotBlank() } ?: transactionCategories.first().subCategories.first()
+            else initialTransaction?.subCategory?.takeIf { it.isNotBlank() } ?: categories.firstOrNull()?.subCategories?.firstOrNull() ?: ""
         )
     }
 
@@ -76,6 +97,7 @@ fun AddTransactionBottomSheet(
     // --- GESTION DU VIREMENT ---
     var targetAccountId by remember { mutableStateOf<String?>(null) }
     var expandedTargetAccount by remember { mutableStateOf(false) }
+    var isTransferIncoming by remember { mutableStateOf(false) }
 
     val activity = LocalActivity.current
     val context = LocalContext.current
@@ -148,8 +170,8 @@ fun AddTransactionBottomSheet(
                         selected = type == "EXPENSE",
                         onClick = {
                             type = "EXPENSE"
-                            familyCategory = transactionCategories.first().name
-                            subCategory = transactionCategories.first().subCategories.first()
+                            familyCategory = categories.firstOrNull()?.name ?: ""
+                            subCategory = categories.firstOrNull()?.subCategories?.firstOrNull() ?: ""
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
                     ) {
@@ -194,14 +216,70 @@ fun AddTransactionBottomSheet(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text(stringResource(R.string.tx_amount_hint)) },
+                    label = { 
+                        val isCrypto = accounts.find { it.id == currentAccountId }?.type == "CRYPTO"
+                        Text(if (isCrypto) "Quantité (ex: 0.1)" else stringResource(R.string.tx_amount_hint)) 
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
             }
 
+            // --- CHAMP SPÉCIFIQUE CRYPTO (Montant en €) ---
+            val currentAccount = accounts.find { it.id == currentAccountId }
+            if (currentAccount?.type == "CRYPTO" && type != "EXPENSE") {
+                item {
+                    OutlinedTextField(
+                        value = investmentEurText,
+                        onValueChange = { investmentEurText = it },
+                        label = { Text("Coût de l'achat (€)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("Ex: 500.00") }
+                    )
+                }
+            }
+
             if (type == "TRANSFER") {
+                item {
+                    val currentAccountName = accounts.find { it.id == currentAccountId }?.name ?: "Ce compte"
+                    val targetAccountName = accounts.find { it.id == targetAccountId }?.name ?: "Autre compte"
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Direction du virement", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                val fromName = if (isTransferIncoming) targetAccountName else currentAccountName
+                                val toName = if (isTransferIncoming) currentAccountName else targetAccountName
+                                
+                                Text(fromName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                
+                                IconButton(onClick = { isTransferIncoming = !isTransferIncoming }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = "Inverser",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Text(toName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                    }
+                }
+
                 item {
                     ExposedDropdownMenuBox(
                         expanded = expandedTargetAccount,
@@ -254,7 +332,7 @@ fun AddTransactionBottomSheet(
                             expanded = expandedFamily,
                             onDismissRequest = { expandedFamily = false }
                         ) {
-                            transactionCategories.forEach { family ->
+                            categories.forEach { family ->
                                 DropdownMenuItem(
                                     text = { Text(family.name, fontWeight = FontWeight.Bold) },
                                     onClick = {
@@ -269,7 +347,7 @@ fun AddTransactionBottomSheet(
                 }
 
                 item {
-                    val currentFamilyObj = transactionCategories.find { it.name == familyCategory }
+                    val currentFamilyObj = categories.find { it.name == familyCategory }
                     val availableSubCategories = currentFamilyObj?.subCategories ?: emptyList()
 
                     ExposedDropdownMenuBox(
@@ -450,6 +528,11 @@ fun AddTransactionBottomSheet(
 
                         if (title.isNotBlank() && rawAmount != 0.0) {
                             val safeEndDate = endDate
+                            
+                            // Déterminer source et destination selon le sens
+                            val finalSourceId = if (type == "TRANSFER" && isTransferIncoming) targetAccountId ?: "" else currentAccountId
+                            val finalTargetId = if (type == "TRANSFER" && isTransferIncoming) currentAccountId else targetAccountId
+
                             onSave(
                                 title,
                                 finalAmount,
@@ -461,7 +544,9 @@ fun AddTransactionBottomSheet(
                                 isRecurring,
                                 if (isRecurring) "MONTHLY" else null,
                                 if (isRecurring && safeEndDate != null) Timestamp(safeEndDate) else null,
-                                targetAccountId
+                                finalSourceId,
+                                finalTargetId,
+                                investmentEurText.toDoubleOrNull()
                             )
                             onDismiss()
                         }

@@ -167,7 +167,8 @@ class AccountDetailViewModel : ViewModel() {
         date: Timestamp,
         isRecurring: Boolean,
         recurrenceInterval: String?,
-        endDate: Timestamp?
+        endDate: Timestamp?,
+        investmentEur: Double? = null // Nouveau paramètre
     ) {
         viewModelScope.launch {
             try {
@@ -204,7 +205,8 @@ class AccountDetailViewModel : ViewModel() {
                     endDate = endDate,
                     checkedMonths = emptyList(),
                     transferGroupId = transferGroupId,
-                    targetAccountId = sourceAccountId
+                    targetAccountId = sourceAccountId,
+                    investmentEur = investmentEur // On stocke l'investissement sur la cible
                 )
                 db.collection("accounts").document(targetAccountId).collection("transactions").add(inTx).await()
             } catch (e: Exception) {
@@ -622,7 +624,7 @@ class AccountDetailViewModel : ViewModel() {
                     val currentGroupId = "${transferGroupIdPrefix}${i}"
                     
                     val creditTx = Transaction(
-                        title = "Échéance prêt ${account.name}",
+                        title = account.name, // Juste le nom
                         amount = totalMonthly,
                         type = "INCOME",
                         familyCategory = "Crédit",
@@ -643,7 +645,7 @@ class AccountDetailViewModel : ViewModel() {
 
                     if (account.linkedAccountId != null && !cal.before(currentMonthStart)) {
                         val debitTx = Transaction(
-                            title = "Prélèvement prêt ${account.name}",
+                            title = account.name, // Juste le nom
                             amount = -totalMonthly,
                             type = "EXPENSE",
                             familyCategory = "Crédit",
@@ -726,6 +728,9 @@ class AccountDetailViewModel : ViewModel() {
                 val transactionsRef = db.collection("accounts").document(accountId).collection("transactions")
                 val transferGroupIdPrefix = "LOAN_PDF_${accountId}_"
                 
+                // Récupération du nom du compte UNE SEULE FOIS pour les libellés
+                val accountName = db.collection("accounts").document(accountId).get().await().getString("name") ?: "Prêt"
+                
                 var importedCount = 0
                 var firstDate: Date? = null
                 var lastDate: Date? = null
@@ -759,7 +764,7 @@ class AccountDetailViewModel : ViewModel() {
                         val currentGroupId = "${transferGroupIdPrefix}${index}"
                         
                         val creditTx = Transaction(
-                            title = "Échéance prêt (Import PDF)",
+                            title = accountName, // Libellé épuré : juste le nom du prêt
                             amount = amount,
                             type = "INCOME",
                             familyCategory = "Crédit",
@@ -777,7 +782,7 @@ class AccountDetailViewModel : ViewModel() {
 
                         if (linkedAccountId != null && !date.before(currentMonthStart.time)) {
                             val debitTx = Transaction(
-                                title = "Prélèvement prêt (Import PDF)",
+                                title = accountName, // Idem sur le compte courant
                                 amount = -amount,
                                 type = "EXPENSE",
                                 familyCategory = "Crédit",

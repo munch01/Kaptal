@@ -1,11 +1,11 @@
 package com.Muncho.kaptal.model
 
 data class CategoryFamily(
-    val name: String,
-    val subCategories: List<String>
+    val name: String = "",
+    val subCategories: List<String> = emptyList()
 )
 
-val transactionCategories = listOf(
+fun getDefaultCategories() = listOf(
     CategoryFamily(
         name = "Vital / Incompressible",
         subCategories = listOf(
@@ -40,3 +40,6 @@ val transactionCategories = listOf(
         )
     )
 )
+
+// Garder pour compatibilité temporaire durant la migration
+val transactionCategories = getDefaultCategories()

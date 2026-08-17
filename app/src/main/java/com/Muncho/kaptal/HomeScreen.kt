@@ -135,7 +135,7 @@ fun HomeScreen(
                                 Toast.makeText(activity, "Erreur : aucune appli d'email", Toast.LENGTH_SHORT).show()
                             }
                         }) {
-                            Icon(Icons.Default.AlternateEmail, contentDescription = "Support Email", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Default.Email, contentDescription = "Support Email", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = { onNavigateToSettings() }) {
                             Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_settings))

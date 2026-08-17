@@ -3,10 +3,14 @@ package com.Muncho.kaptal
 import android.app.Application
 import android.content.Context
 import com.Muncho.kaptal.model.Account
+import com.Muncho.kaptal.model.CategoryFamily
+import com.Muncho.kaptal.model.getDefaultCategories
 import org.json.JSONObject
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
@@ -35,6 +39,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         private set
 
     var selectedLanguage by mutableStateOf(prefs.getString("selected_language", "Français") ?: "Français")
+        private set
+
+    var userCategories = mutableStateListOf<CategoryFamily>()
         private set
 
     val currentUser get() = auth.currentUser
@@ -78,6 +85,26 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         prefs.edit().putBoolean("biometric_enabled", cloudBiometric).apply()
                     }
                 }
+
+                // Mise à jour des catégories depuis le Cloud
+                val cloudCategories = snapshot.get("categories") as? List<Map<String, Any>>
+                if (cloudCategories != null) {
+                    val families = cloudCategories.map { map ->
+                        CategoryFamily(
+                            name = map["name"] as? String ?: "",
+                            subCategories = map["subCategories"] as? List<String> ?: emptyList()
+                        )
+                    }
+                    if (families != userCategories.toList()) {
+                        userCategories.clear()
+                        userCategories.addAll(families)
+                    }
+                } else if (userCategories.isEmpty()) {
+                    // Initialisation si vide
+                    val defaults = getDefaultCategories()
+                    userCategories.addAll(defaults)
+                    syncUserSettingsToFirebase(mapOf("categories" to defaults))
+                }
             }
     }
 
@@ -104,6 +131,48 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         isBiometricEnabled = enabled
         prefs.edit().putBoolean("biometric_enabled", enabled).apply()
         syncUserSettingsToFirebase(mapOf("biometricEnabled" to enabled))
+    }
+
+    // --- GESTION DES CATÉGORIES ---
+    
+    fun addCategoryFamily(name: String) {
+        if (name.isBlank() || userCategories.any { it.name == name }) return
+        val newList = userCategories.toMutableList()
+        newList.add(CategoryFamily(name = name, subCategories = emptyList()))
+        syncUserSettingsToFirebase(mapOf("categories" to newList))
+    }
+
+    fun deleteCategoryFamily(name: String) {
+        val newList = userCategories.filter { it.name != name }
+        syncUserSettingsToFirebase(mapOf("categories" to newList))
+    }
+
+    fun addSubCategory(familyName: String, subName: String) {
+        if (subName.isBlank()) return
+        val newList = userCategories.map { family ->
+            if (family.name == familyName) {
+                if (family.subCategories.contains(subName)) return@map family
+                family.copy(subCategories = family.subCategories + subName)
+            } else family
+        }
+        syncUserSettingsToFirebase(mapOf("categories" to newList))
+    }
+
+    fun deleteSubCategory(familyName: String, subName: String) {
+        val newList = userCategories.map { family ->
+            if (family.name == familyName) {
+                family.copy(subCategories = family.subCategories.filter { it != subName })
+            } else family
+        }
+        syncUserSettingsToFirebase(mapOf("categories" to newList))
+    }
+
+    fun renameFamily(oldName: String, newName: String) {
+        if (newName.isBlank() || userCategories.any { it.name == newName }) return
+        val newList = userCategories.map { family ->
+            if (family.name == oldName) family.copy(name = newName) else family
+        }
+        syncUserSettingsToFirebase(mapOf("categories" to newList))
     }
 
     fun sendPasswordResetEmail(onResult: (Boolean, String) -> Unit) {

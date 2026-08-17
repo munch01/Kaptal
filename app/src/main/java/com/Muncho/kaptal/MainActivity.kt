@@ -26,7 +26,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.Muncho.kaptal.screens.CategoryManagementScreen
 import com.Muncho.kaptal.screens.CreditAccountScreen
+import com.Muncho.kaptal.screens.CryptoScreen
 import com.Muncho.kaptal.screens.StandardAccountScreen
 import com.Muncho.kaptal.ui.theme.KaptalTheme
 import com.google.android.play.core.appupdate.AppUpdateManager
@@ -47,16 +49,7 @@ class MainActivity : FragmentActivity() {
     override fun attachBaseContext(newBase: Context) {
         val prefs = newBase.getSharedPreferences("kaptal_prefs", Context.MODE_PRIVATE)
         val lang = prefs.getString("selected_language", "Français") ?: "Français"
-        val locale = when (lang) {
-            "English" -> Locale.ENGLISH
-            "Español" -> Locale("es")
-            else -> Locale.FRENCH
-        }
-        Locale.setDefault(locale)
-        val config = newBase.resources.configuration
-        config.setLocale(locale)
-        val context = newBase.createConfigurationContext(config)
-        super.attachBaseContext(context)
+        super.attachBaseContext(LocaleHelper.setLocale(newBase, lang))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -207,6 +200,7 @@ fun KaptalApp(
                         val route = when (account.type) {
                             "CREDIT" -> "credit_detail"
                             "LIVRET_A" -> "livret_a_detail"
+                            "CRYPTO" -> "crypto_detail"
                             else -> "standard_detail"
                         }
                         navController.navigate("$route/${account.id}")
@@ -261,8 +255,18 @@ fun KaptalApp(
                     onBackClick = {
                         navController.popBackStack()
                     },
+                    onNavigateToCategories = {
+                        navController.navigate("category_management")
+                    },
                     allAccounts = allAccounts,
                     allBalances = allBalances,
+                    viewModel = settingsViewModel
+                )
+            }
+
+            composable("category_management") {
+                CategoryManagementScreen(
+                    onBackClick = { navController.popBackStack() },
                     viewModel = settingsViewModel
                 )
             }
@@ -273,28 +277,19 @@ fun KaptalApp(
             ) { backStackEntry ->
                 val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                 val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                val account = allAccounts.find { it.id == accountId }
                 
-                when (val state = uiState) {
-                    is AccountsUiState.Success -> {
-                        val account = state.accounts.find { it.id == accountId }
-                        account?.let { acc ->
-                            StandardAccountScreen(
-                                account = acc,
-                                allAccounts = state.accounts,
-                                initialPage = viewModel.getSavedPagerPosition(acc.id),
-                                onPageChanged = { page ->
-                                    viewModel.savePagerPosition(acc.id, page)
-                                },
-                                onBackClick = { navController.popBackStack() }
-                            )
-                        }
-                    }
-                    is AccountsUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                    else -> {}
+                account?.let { acc ->
+                    StandardAccountScreen(
+                        account = acc,
+                        allAccounts = allAccounts,
+                        initialPage = viewModel.getSavedPagerPosition(acc.id),
+                        onPageChanged = { page ->
+                            viewModel.savePagerPosition(acc.id, page)
+                        },
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
             }
 
@@ -304,25 +299,16 @@ fun KaptalApp(
             ) { backStackEntry ->
                 val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                 val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                val account = allAccounts.find { it.id == accountId }
                 
-                when (val state = uiState) {
-                    is AccountsUiState.Success -> {
-                        val account = state.accounts.find { it.id == accountId }
-                        account?.let { acc ->
-                            CreditAccountScreen(
-                                account = acc,
-                                allAccounts = state.accounts,
-                                onBackClick = { navController.popBackStack() },
-                                mainViewModel = viewModel
-                            )
-                        }
-                    }
-                    is AccountsUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                    else -> {}
+                account?.let { acc ->
+                    CreditAccountScreen(
+                        account = acc,
+                        allAccounts = allAccounts,
+                        onBackClick = { navController.popBackStack() },
+                        mainViewModel = viewModel
+                    )
                 }
             }
 
@@ -332,28 +318,37 @@ fun KaptalApp(
             ) { backStackEntry ->
                 val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                 val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                val account = allAccounts.find { it.id == accountId }
                 
-                when (val state = uiState) {
-                    is AccountsUiState.Success -> {
-                        val account = state.accounts.find { it.id == accountId }
-                        account?.let { acc ->
-                            StandardAccountScreen(
-                                account = acc,
-                                allAccounts = state.accounts,
-                                initialPage = viewModel.getSavedPagerPosition(acc.id),
-                                onPageChanged = { page ->
-                                    viewModel.savePagerPosition(acc.id, page)
-                                },
-                                onBackClick = { navController.popBackStack() }
-                            )
-                        }
-                    }
-                    is AccountsUiState.Loading -> {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                    else -> {}
+                account?.let { acc ->
+                    StandardAccountScreen(
+                        account = acc,
+                        allAccounts = allAccounts,
+                        initialPage = viewModel.getSavedPagerPosition(acc.id),
+                        onPageChanged = { page ->
+                            viewModel.savePagerPosition(acc.id, page)
+                        },
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            composable(
+                route = "crypto_detail/{accountId}",
+                arguments = listOf(navArgument("accountId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
+                val uiState by viewModel.uiState.collectAsState()
+                val allAccounts = if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+                val account = allAccounts.find { it.id == accountId }
+                
+                account?.let { acc ->
+                    CryptoScreen(
+                        account = acc,
+                        onBackClick = { navController.popBackStack() },
+                        mainViewModel = viewModel
+                    )
                 }
             }
         }

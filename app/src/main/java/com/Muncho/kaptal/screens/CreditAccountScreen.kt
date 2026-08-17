@@ -8,7 +8,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,6 +48,7 @@ fun CreditAccountScreen(
     val context = LocalContext.current
     val linkedAccount = allAccounts.find { it.id == account.linkedAccountId }
     var showSetupDialog by remember { mutableStateOf(false) }
+    var showChartSheet by remember { mutableStateOf(false) }
     
     val importStatus by detailViewModel.importStatus.collectAsState()
     val transactions by detailViewModel.transactions.collectAsState()
@@ -119,6 +119,15 @@ fun CreditAccountScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.back_label)
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showChartSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.PieChart,
+                                contentDescription = stringResource(R.string.account_detail_chart),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     },
@@ -302,6 +311,16 @@ fun CreditAccountScreen(
                 }
             }
         }
+        if (showChartSheet) {
+            // On prend le mois en cours par défaut pour le crédit
+            val now = Calendar.getInstance()
+            CategoryDistributionDialog(
+                transactions = transactions,
+                year = now.get(Calendar.YEAR),
+                month = now.get(Calendar.MONTH),
+                onDismiss = { showChartSheet = false }
+            )
+        }
     }
 
     if (pdfRows.isNotEmpty()) {
@@ -325,16 +344,14 @@ fun CreditAccountScreen(
     }
 
     if (showSetupDialog) {
-        // Pré-remplissage avec les données actuelles avec protection
+        // Pré-remplissage
         var firstInstallmentDate by remember { 
             mutableStateOf(
                 try {
                     if (account.loanStartDate != null) 
                         SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE).parse(account.loanStartDate) ?: Date()
                     else Date()
-                } catch (e: Exception) {
-                    Date()
-                }
+                } catch (e: Exception) { Date() }
             ) 
         }
         var monthlyPayment by remember { mutableStateOf(account.loanMonthlyPayment?.toString() ?: "") }
@@ -342,154 +359,116 @@ fun CreditAccountScreen(
         var insurance by remember { mutableStateOf(account.loanInsurance?.toString() ?: "") }
         var rate by remember { mutableStateOf(account.loanRate?.toString() ?: "") }
         var totalCapital by remember { mutableStateOf(account.totalAmount?.toString() ?: "") }
-        var withdrawalDay by remember { 
-            mutableStateOf(
-                if (transactions.isNotEmpty()) {
-                    val cal = Calendar.getInstance().apply { time = transactions.first().date.toDate() }
-                    cal.get(Calendar.DAY_OF_MONTH).toString()
-                } else "5"
-            )
-        }
+        var withdrawalDay by remember { mutableStateOf("5") }
+        
+        var editMode by remember { mutableStateOf(if (transactions.isNotEmpty()) 0 else 1) } // 0: Capital seul, 1: Tout
         
         val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
 
         AlertDialog(
             onDismissRequest = { showSetupDialog = false },
-            title = { Text("Configuration du prêt") },
+            title = { Text(if (editMode == 0) "Ajuster le Capital" else "Configuration du prêt") },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (transactions.isNotEmpty()) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    "Attention : Modifier les mensualités supprimera vos données PDF. Pour ajuster seulement le capital, utilisez 'Sauver Capital'.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                selected = editMode == 0,
+                                onClick = { editMode = 0 },
+                                shape = SegmentedButtonDefaults.itemShape(0, 2)
+                            ) { Text("Capital seul", fontSize = 10.sp) }
+                            SegmentedButton(
+                                selected = editMode == 1,
+                                onClick = { editMode = 1 },
+                                shape = SegmentedButtonDefaults.itemShape(1, 2)
+                            ) { Text("Régénérer tout", fontSize = 10.sp) }
                         }
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            val activity = context.findActivity() ?: return@OutlinedButton
-                            val cal = Calendar.getInstance().apply { time = firstInstallmentDate }
-                            DatePickerDialog(activity, { _, year, month, day ->
-                                firstInstallmentDate = Calendar.getInstance().apply { set(year, month, day) }.time
-                            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("1ère échéance : ${dateFormat.format(firstInstallmentDate)}")
-                    }
-
-                    OutlinedTextField(
-                        value = totalCapital, 
-                        onValueChange = { totalCapital = it }, 
-                        label = { Text("Capital Emprunté (€)") }, 
-                        placeholder = { Text("Ex: 13300") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    
-                    // Prévisualisation du coût total (Mensualité x Durée)
-                    val mVal = monthlyPayment.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    val dVal = durationMonths.toIntOrNull() ?: 0
-                    if (mVal > 0 && dVal > 0) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(8.dp),
+                    if (editMode == 0) {
+                        Text(
+                            "Cette option met à jour le montant emprunté sans modifier vos mensualités (PDF conservé).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedTextField(
+                            value = totalCapital, 
+                            onValueChange = { totalCapital = it }, 
+                            label = { Text("Capital Emprunté (€)") }, 
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        OutlinedButton(
+                            onClick = {
+                                val activity = context.findActivity() ?: return@OutlinedButton
+                                val cal = Calendar.getInstance().apply { time = firstInstallmentDate }
+                                DatePickerDialog(activity, { _, year, month, day ->
+                                    firstInstallmentDate = Calendar.getInstance().apply { set(year, month, day) }.time
+                                }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Aperçu du coût total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                                Text("Coût total : %.2f €".format(mVal * dVal), fontWeight = FontWeight.Bold)
-                                
-                                // Calcul date de fin estimée
-                                val calEnd = Calendar.getInstance().apply {
-                                    time = firstInstallmentDate
-                                    add(Calendar.MONTH, dVal - 1)
-                                }
-                                Text("Fin prévue : ${dateFormat.format(calEnd.time)}", fontSize = 11.sp)
-                            }
+                            Text("1ère échéance : ${dateFormat.format(firstInstallmentDate)}")
                         }
-                    }
-                    
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(value = monthlyPayment, onValueChange = { monthlyPayment = it }, label = { Text("Mensualité (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                        OutlinedTextField(value = insurance, onValueChange = { insurance = it }, label = { Text("Assurance (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                    }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(value = durationMonths, onValueChange = { durationMonths = it }, label = { Text("Durée (mois)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                        OutlinedTextField(value = withdrawalDay, onValueChange = { withdrawalDay = it }, label = { Text("Jour prélèvement") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                        OutlinedTextField(
+                            value = totalCapital, 
+                            onValueChange = { totalCapital = it }, 
+                            label = { Text("Capital Emprunté (€)") }, 
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = monthlyPayment, onValueChange = { monthlyPayment = it }, label = { Text("Mensualité (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                            OutlinedTextField(value = insurance, onValueChange = { insurance = it }, label = { Text("Assurance (€)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = durationMonths, onValueChange = { durationMonths = it }, label = { Text("Durée (mois)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                            OutlinedTextField(value = withdrawalDay, onValueChange = { withdrawalDay = it }, label = { Text("Jour prélèvement") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                        }
+                        
+                        OutlinedTextField(value = rate, onValueChange = { rate = it }, label = { Text("Taux (%)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                     }
-                    
-                    OutlinedTextField(value = rate, onValueChange = { rate = it }, label = { Text("Taux (%)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
                 }
             },
             confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val cVal = totalCapital.replace(",", ".").toDoubleOrNull() ?: 0.0
-                    
-                    // 1. BOUTON : Uniquement mettre à jour le capital (Ne touche pas aux transactions)
-                    if (transactions.isNotEmpty()) {
-                        TextButton(
-                            onClick = {
-                                if (cVal > 0) {
-                                    detailViewModel.updateLoanMetadata(account.id, cVal)
-                                    showSetupDialog = false
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Sauver Capital", textAlign = TextAlign.Center)
+                val cVal = totalCapital.replace(",", ".").toDoubleOrNull() ?: 0.0
+                Button(onClick = {
+                    if (editMode == 0) {
+                        if (cVal > 0) {
+                            detailViewModel.updateLoanMetadata(account.id, cVal)
+                            showSetupDialog = false
+                        }
+                    } else {
+                        val m = monthlyPayment.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val d = durationMonths.toIntOrNull() ?: 0
+                        val i = insurance.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val r = rate.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val wDay = withdrawalDay.toIntOrNull() ?: 5
+                        
+                        if (m > 0 && d > 0 && cVal > 0) {
+                            detailViewModel.generateLoanInstallments(
+                                context = context,
+                                account = account,
+                                startDate = firstInstallmentDate,
+                                monthlyPayment = m,
+                                durationMonths = d,
+                                totalCapital = cVal,
+                                insurance = i,
+                                rate = r,
+                                withdrawalDay = wDay
+                            )
+                            showSetupDialog = false
                         }
                     }
-
-                    // 2. BOUTON : Tout régénérer (Écrase tout)
-                    Button(
-                        onClick = {
-                            val m = monthlyPayment.replace(",", ".").toDoubleOrNull() ?: 0.0
-                            val d = durationMonths.toIntOrNull() ?: 0
-                            val i = insurance.replace(",", ".").toDoubleOrNull() ?: 0.0
-                            val r = rate.replace(",", ".").toDoubleOrNull() ?: 0.0
-                            val wDay = withdrawalDay.toIntOrNull() ?: 5
-                            
-                            if (m > 0 && d > 0 && cVal > 0) {
-                                detailViewModel.generateLoanInstallments(
-                                    context = context,
-                                    account = account,
-                                    startDate = firstInstallmentDate,
-                                    monthlyPayment = m,
-                                    durationMonths = d,
-                                    totalCapital = cVal,
-                                    insurance = i,
-                                    rate = r,
-                                    withdrawalDay = wDay
-                                )
-                                showSetupDialog = false
-                            }
-                        },
-                        colors = if (transactions.isNotEmpty()) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) 
-                                 else ButtonDefaults.buttonColors(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (transactions.isNotEmpty()) "Régénérer" else "Générer", textAlign = TextAlign.Center)
-                    }
+                }) {
+                    Text(if (editMode == 0) "Mettre à jour" else "Générer")
                 }
             },
             dismissButton = {

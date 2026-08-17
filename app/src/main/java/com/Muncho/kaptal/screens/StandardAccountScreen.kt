@@ -1,6 +1,5 @@
 package com.Muncho.kaptal.screens
 
-import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -32,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.Muncho.kaptal.R
 import com.Muncho.kaptal.MainViewModel
+import com.Muncho.kaptal.SettingsViewModel
 import com.Muncho.kaptal.model.Account
 import com.Muncho.kaptal.model.Transaction
 import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
@@ -53,6 +53,7 @@ fun StandardAccountScreen(
 ) {
     val transactions by detailViewModel.transactions.collectAsState()
     val livretARate by mainViewModel.livretARate.collectAsState()
+    val categories = viewModel<SettingsViewModel>().userCategories
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showChartSheet by remember { mutableStateOf(false) }
@@ -127,20 +128,10 @@ fun StandardAccountScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:3lmunch0@gmail.com")
-                                putExtra(Intent.EXTRA_SUBJECT, "Support Kaptal - ${account.name}")
-                            }
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Aucune application d'e-mail trouvée", Toast.LENGTH_SHORT).show()
-                            }
-                        }) {
+                        IconButton(onClick = { showChartSheet = true }) {
                             Icon(
-                                imageVector = Icons.Default.AlternateEmail,
-                                contentDescription = "Support Email",
+                                imageVector = Icons.Default.PieChart,
+                                contentDescription = stringResource(R.string.account_detail_chart),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -400,18 +391,20 @@ fun StandardAccountScreen(
         AddTransactionBottomSheet(
             accounts = allAccounts,
             currentAccountId = account.id,
+            categories = categories,
             onDismiss = { showAddSheet = false },
-            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, targetAccountId ->
-                if (type == "TRANSFER" && targetAccountId != null) {
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur ->
+                if (type == "TRANSFER" && targetId != null) {
                     detailViewModel.performTransfer(
-                        sourceAccountId = account.id,
-                        targetAccountId = targetAccountId,
+                        sourceAccountId = sourceId,
+                        targetAccountId = targetId,
                         amount = amount,
                         title = title,
                         date = date,
                         isRecurring = isRecurring,
                         recurrenceInterval = recurrenceInterval,
-                        endDate = endDate
+                        endDate = endDate,
+                        investmentEur = investmentEur // À ajouter au performTransfer
                     )
                 } else {
                     val newTransaction = Transaction(
@@ -425,7 +418,8 @@ fun StandardAccountScreen(
                         checkedMonths = emptyList(),
                         isRecurring = isRecurring,
                         recurrenceInterval = recurrenceInterval ?: "Mensuel",
-                        endDate = endDate
+                        endDate = endDate,
+                        investmentEur = investmentEur
                     )
                     detailViewModel.addTransaction(account.id, newTransaction)
                 }
@@ -439,8 +433,9 @@ fun StandardAccountScreen(
             initialTransaction = transaction,
             accounts = allAccounts,
             currentAccountId = account.id,
+            categories = categories,
             onDismiss = { transactionToEdit = null },
-            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, _ ->
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur ->
                 if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
                     detailViewModel.updateRecurringTransactionWithScope(
                         accountId = account.id,
@@ -469,7 +464,8 @@ fun StandardAccountScreen(
                         date = date,
                         isRecurring = isRecurring,
                         recurrenceInterval = recurrenceInterval ?: transaction.recurrenceInterval,
-                        endDate = endDate
+                        endDate = endDate,
+                        investmentEur = investmentEur
                     )
                     detailViewModel.updateTransaction(account.id, updatedTransaction)
                 }
@@ -479,160 +475,7 @@ fun StandardAccountScreen(
     }
 }
 
-@Composable
-fun CategoryDistributionDialog(
-    transactions: List<Transaction>,
-    year: Int,
-    month: Int,
-    onDismiss: () -> Unit
-) {
-    val activeTransactions = remember(transactions, year, month) {
-        transactions.filter { tx -> isTransactionActiveInMonth(tx, year, month) }
-    }
 
-    val categoryHierarchy = remember(activeTransactions, year, month) {
-        val expenses = activeTransactions.filter { it.amount < 0 }
-        val totalExp = expenses.sumOf { kotlin.math.abs(it.amount) }
-
-        expenses.groupBy { it.familyCategory?.ifEmpty { "Autre" } ?: "Autre" }
-            .map { (family, familyTxList) ->
-                val familyTotal = familyTxList.sumOf { kotlin.math.abs(it.amount) }
-                val familyPercentage = if (totalExp > 0) (familyTotal / totalExp) * 100 else 0.0
-
-                val subCategories = familyTxList.groupBy { it.subCategory?.ifEmpty { "Autre" } ?: "Autre" }
-                    .map { (sub, subTxList) ->
-                        val subTotal = subTxList.sumOf { kotlin.math.abs(it.amount) }
-                        val subPercentageOfFamily = if (familyTotal > 0) (subTotal / familyTotal) * 100 else 0.0
-                        Triple(sub, subTotal, subPercentageOfFamily)
-                    }
-                    .sortedByDescending { it.second }
-
-                Quadruple(family, familyTotal, familyPercentage, subCategories)
-            }
-            .sortedByDescending { it.second }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.category_distribution), fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 450.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.category_expenses_for, getMonthName(year, month)),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                if (categoryHierarchy.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.category_no_expenses),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(categoryHierarchy) { (family, familyAmount, familyPercentage, subCategories) ->
-                            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = family,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "${String.format(Locale.FRANCE, "%.2f", familyAmount)} € (${String.format(Locale.FRANCE, "%.1f", familyPercentage)}%)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                LinearProgressIndicator(
-                                    progress = { (familyPercentage / 100).toFloat() },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(CircleShape),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    subCategories.forEach { (subCategory, subAmount, subPercentageOfFamily) ->
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "• $subCategory",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = "${String.format(Locale.FRANCE, "%.2f", subAmount)} € (${String.format(Locale.FRANCE, "%.1f", subPercentageOfFamily)}%)",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            LinearProgressIndicator(
-                                                progress = { (subPercentageOfFamily / 100).toFloat() },
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(4.dp)
-                                                    .clip(CircleShape),
-                                                color = MaterialTheme.colorScheme.secondary,
-                                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.category_close)) }
-        }
-    )
-}
-
-data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 @Composable
 fun MonthPageContent(
@@ -786,30 +629,7 @@ fun MonthPageContent(
     }
 }
 
-private fun isTransactionActiveInMonth(tx: Transaction, year: Int, month: Int): Boolean {
-    val txDate = tx.date.toDate()
-    val txCal = Calendar.getInstance().apply { time = txDate }
-    val txYear = txCal.get(Calendar.YEAR)
-    val txMonth = txCal.get(Calendar.MONTH)
 
-    val targetIndex = year * 12 + month
-    val startIndex = txYear * 12 + txMonth
-
-    return if (tx.isRecurring) {
-        val startsBeforeOrDuring = startIndex <= targetIndex
-        val endsAfterOrDuring = if (tx.endDate != null) {
-            val endDate = tx.endDate.toDate()
-            val endCal = Calendar.getInstance().apply { time = endDate }
-            val endIndex = endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
-            targetIndex < endIndex
-        } else {
-            true
-        }
-        startsBeforeOrDuring && endsAfterOrDuring
-    } else {
-        startIndex == targetIndex
-    }
-}
 
 private fun computeCumulativeBalance(
     initialBalance: Double,
@@ -871,17 +691,7 @@ private fun computeCumulativeBalance(
     return total
 }
 
-@Composable
-fun getCategoryIndicatorColor(family: String?): Color {
-    val cleanFamily = family?.lowercase(Locale.ROOT)?.trim() ?: ""
-    return when {
-        cleanFamily.contains("vital") || cleanFamily.contains("incompressible") -> Color(0xFF2E7D32)
-        cleanFamily.contains("confort") || cleanFamily.contains("vie courante") -> Color(0xFF1976D2)
-        cleanFamily.contains("superficiel") || cleanFamily.contains("plaisir") -> Color(0xFFE65100)
-        cleanFamily.contains("salaire") || cleanFamily.contains("revenu") -> Color(0xFF388E3C)
-        else -> Color(0xFF9E9E9E)
-    }
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1024,12 +834,4 @@ fun TransactionItem(
             }
         }
     }
-}
-
-private fun getMonthName(year: Int, month: Int): String {
-    val calendar = Calendar.getInstance().apply {
-        set(year, month, 1)
-    }
-    val sdf = SimpleDateFormat("MMMM yyyy", Locale.FRENCH)
-    return sdf.format(calendar.time).replaceFirstChar { it.uppercase() }
 }

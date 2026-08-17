@@ -37,12 +37,13 @@ import com.Muncho.kaptal.model.Account
 @Composable
 fun SettingsScreen(
     onBackClick: () -> Unit,
+    onNavigateToCategories: () -> Unit,
     allAccounts: List<Account> = emptyList(),
     allBalances: Map<String, Double> = emptyMap(),
     viewModel: SettingsViewModel = viewModel()
 ) {
-    val context = LocalContext.current
     val activity = LocalActivity.current
+    val context = LocalContext.current
     val currentUser = viewModel.currentUser
 
     // Dialogues
@@ -63,10 +64,10 @@ fun SettingsScreen(
                 activity.contentResolver.openOutputStream(it)?.use { stream ->
                     stream.write(data.toByteArray())
                 }
-                Toast.makeText(context, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "Kaptal_Data.json enregistré !", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Erreur lors de l'export JSON", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "Erreur lors de l'export JSON", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -77,10 +78,10 @@ fun SettingsScreen(
                 activity.contentResolver.openOutputStream(it)?.use { stream ->
                     stream.write(data.toByteArray())
                 }
-                Toast.makeText(context, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "Kaptal_Export.csv enregistré !", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Erreur lors de l'export CSV", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "Erreur lors de l'export CSV", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -245,7 +246,7 @@ fun SettingsScreen(
                             subtitle = stringResource(R.string.settings_password_subtitle),
                             onClick = {
                                 viewModel.sendPasswordResetEmail { success, message ->
-                                    Toast.makeText(context, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(activity, message, if (success) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
                                 }
                             }
                         )
@@ -282,6 +283,15 @@ fun SettingsScreen(
                             subtitle = viewModel.selectedLanguage,
                             onClick = { showLanguageDialog = true }
                         )
+
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                        SettingsClickableItem(
+                            icon = Icons.Default.Category,
+                            title = "Gérer les catégories",
+                            subtitle = "Personnaliser vos familles et sous-catégories",
+                            onClick = onNavigateToCategories
+                        )
                     }
                 }
 
@@ -309,7 +319,7 @@ fun SettingsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal")).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                context.startActivity(intent)
+                                activity.startActivity(intent)
                             }
                         )
 
@@ -324,7 +334,7 @@ fun SettingsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/munch01/Kaptal/blob/master/LICENSE")).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                context.startActivity(intent)
+                                activity.startActivity(intent)
                             }
                         )
 
@@ -339,7 +349,7 @@ fun SettingsScreen(
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://munch01.github.io/Kaptal/index.md")).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
-                                context.startActivity(intent)
+                                activity.startActivity(intent)
                             }
                         )
 
