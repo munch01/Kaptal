@@ -138,8 +138,39 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun selectAccount(account: Account?) {
-        _selectedAccount.value = account
+    // --- StateFlow pour l'historique crypto (Liste de paires : Timestamp -> Prix en €) ---
+    private val _cryptoHistory = MutableStateFlow<List<Pair<Long, Double>>>(emptyList())
+    val cryptoHistory: StateFlow<List<Pair<Long, Double>>> = _cryptoHistory.asStateFlow()
+
+    private val coinIdMap = mapOf(
+        "BTC" to "bitcoin",
+        "ETH" to "ethereum",
+        "SOL" to "solana",
+        "USDT" to "tether",
+        "ADA" to "cardano",
+        "XRP" to "ripple"
+    )
+
+    fun fetchCryptoHistory(symbol: String) {
+        val coinId = coinIdMap[symbol] ?: return
+        viewModelScope.launch {
+            try {
+                val history = withContext(Dispatchers.IO) {
+                    val url = URL("https://api.coingecko.com/api/v3/coins/$coinId/market_chart?vs_currency=eur&days=30&interval=daily")
+                    val jsonString = url.readText()
+                    val prices = JSONObject(jsonString).getJSONArray("prices")
+                    val list = mutableListOf<Pair<Long, Double>>()
+                    for (i in 0 until prices.length()) {
+                        val item = prices.getJSONArray(i)
+                        list.add(item.getLong(0) to item.getDouble(1))
+                    }
+                    list
+                }
+                _cryptoHistory.value = history
+            } catch (e: Exception) {
+                Log.e("CRYPTO_HISTORY", "Erreur fetch : ${e.localizedMessage}")
+            }
+        }
     }
 
     /**

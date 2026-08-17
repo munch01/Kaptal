@@ -7,19 +7,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,19 +41,34 @@ fun CryptoScreen(
 ) {
     val transactions by detailViewModel.transactions.collectAsState()
     val cryptoRates by mainViewModel.cryptoRates.collectAsState()
-    val currency by mainViewModel.appCurrency.collectAsState()
+    val cryptoHistory by mainViewModel.cryptoHistory.collectAsState()
 
     LaunchedEffect(account.id) {
         detailViewModel.loadTransactions(account.id)
+        // On récupère l'historique (par défaut BTC ici)
+        mainViewModel.fetchCryptoHistory("BTC")
     }
 
-    val currentRate = cryptoRates["BTC"] ?: 0.0 // À adapter selon le symbole réel du compte
+    val currentRate = cryptoRates["BTC"] ?: 0.0
     val totalInvested = remember(transactions) { mainViewModel.calculateTotalInvestment(transactions) }
+    
+    // Performance calculée en direct sur le taux actuel
     val performance = remember(transactions, currentRate) { 
         mainViewModel.calculatePortfolioPerformance(account, transactions, currentRate) 
     }
-    
     val (gainLoss, gainLossPercent) = performance
+
+    // Points de la courbe (Gain/Perte historique)
+    val gainLossPoints = remember(transactions, cryptoHistory) {
+        if (cryptoHistory.isEmpty()) return@remember emptyList<Float>()
+        cryptoHistory.map { (timestamp, price) ->
+            val txsBefore = transactions.filter { it.date.toDate().time <= timestamp }
+            val qtyAtPoint = txsBefore.sumOf { it.amount }
+            val costAtPoint = txsBefore.sumOf { it.investmentEur ?: it.amount }
+            val valueAtPoint = qtyAtPoint * price
+            (valueAtPoint - costAtPoint).toFloat()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -98,14 +112,14 @@ fun CryptoScreen(
                         shape = RoundedCornerShape(24.dp)
                     ) {
                         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Gain / Perte Total", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                            Text("Plus-value / Moins-value", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                             
                             val isPositive = gainLoss >= 0
                             val color = if (isPositive) Color(0xFF2E7D32) else Color(0xFFC62828)
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                    imageVector = if (isPositive) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown,
                                     contentDescription = null,
                                     tint = color,
                                     modifier = Modifier.size(32.dp)
@@ -136,11 +150,11 @@ fun CryptoScreen(
                             
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column {
-                                    Text("Total Investi", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    Text("Investi (Prix de revient)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                                     Text("%.2f €".format(totalInvested), fontWeight = FontWeight.Bold)
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("Valeur Actuelle", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                    Text("Valeur Portefeuille", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                                     Text("%.2f €".format(totalInvested + gainLoss), fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -148,28 +162,33 @@ fun CryptoScreen(
                     }
                 }
 
-                // 2. GRAPHIQUE PERFORMANCE (COURBE)
+                // 2. GRAPHIQUE PERFORMANCE RÉELLE
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.8f))
+                        modifier = Modifier.fillMaxWidth().height(240.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.8f)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                            PerformanceCurve(transactions, currentRate)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Évolution Profit/Perte (30j)", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                RealPerformanceCurve(gainLossPoints)
+                            }
                         }
                     }
                 }
 
-                // 3. LISTE DES APPORTS
+                // 3. HISTORIQUE DES APPORTS (ACHATS)
                 item {
-                    Text("Historique des apports", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text("Historique des achats", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
 
                 val apports = transactions.filter { it.type == "INCOME" || (it.type == "TRANSFER" && it.amount > 0) }
                     .sortedByDescending { it.date }
 
                 items(apports) { tx ->
-                    ApportItem(tx, totalInvested, currentRate)
+                    ApportItem(tx, totalInvested)
                 }
             }
         }
@@ -177,29 +196,51 @@ fun CryptoScreen(
 }
 
 @Composable
-fun PerformanceCurve(transactions: List<Transaction>, currentRate: Double) {
+fun RealPerformanceCurve(points: List<Float>) {
     Canvas(modifier = Modifier.fillMaxSize()) {
-        if (transactions.isEmpty()) return@Canvas
+        if (points.size < 2) return@Canvas
         
-        // Logique simplifiée de courbe d'évolution
-        // On dessine une courbe qui monte ou descend vers le point final actuel
-        val path = Path()
         val width = size.width
         val height = size.height
+        val minVal = points.minOrNull() ?: 0f
+        val maxVal = points.maxOrNull() ?: 0f
         
-        path.moveTo(0f, height * 0.8f)
-        path.quadraticTo(width * 0.5f, height * 0.5f, width, height * 0.2f)
+        val absoluteMax = maxOf(Math.abs(minVal), Math.abs(maxVal), 50f)
         
+        fun getY(value: Float): Float {
+            return height / 2f - (value / absoluteMax) * (height / 2f)
+        }
+
+        // Ligne de rentabilité (0€)
+        drawLine(
+            color = Color.LightGray.copy(alpha = 0.5f),
+            start = androidx.compose.ui.geometry.Offset(0f, height / 2f),
+            end = androidx.compose.ui.geometry.Offset(width, height / 2f),
+            strokeWidth = 1.dp.toPx()
+        )
+
+        val path = Path()
+        val stepX = width / (points.size - 1)
+        
+        points.forEachIndexed { i, valAtPoint ->
+            val x = i * stepX
+            val y = getY(valAtPoint)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        
+        val lastVal = points.last()
+        val curveColor = if (lastVal >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
+
         drawPath(
             path = path,
-            color = Color(0xFF2196F3),
-            style = Stroke(width = 3.dp.toPx())
+            color = curveColor,
+            style = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
         )
     }
 }
 
 @Composable
-fun ApportItem(tx: Transaction, totalInvested: Double, currentRate: Double) {
+fun ApportItem(tx: Transaction, totalInvested: Double) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.7f)),
@@ -213,13 +254,15 @@ fun ApportItem(tx: Transaction, totalInvested: Double, currentRate: Double) {
             Column {
                 val dateStr = SimpleDateFormat("dd MMM yyyy", Locale.FRANCE).format(tx.date.toDate())
                 Text(dateStr, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                Text(tx.title ?: "Apport", fontWeight = FontWeight.Bold)
+                Text(tx.title ?: "Achat Crypto", fontWeight = FontWeight.Bold)
             }
             
             Column(horizontalAlignment = Alignment.End) {
-                Text("%.2f €".format(tx.amount), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                val percentage = if (totalInvested > 0) (tx.amount / totalInvested) * 100 else 0.0
-                Text("%.1f%% du total".format(percentage), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                // On affiche le coût réel de l'achat
+                val cost = tx.investmentEur ?: tx.amount
+                Text("%.2f €".format(cost), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                val percentage = if (totalInvested > 0) (cost / totalInvested) * 100 else 0.0
+                Text("%.1f%% du total investi".format(percentage), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
             }
         }
     }
