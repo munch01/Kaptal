@@ -624,7 +624,7 @@ class AccountDetailViewModel : ViewModel() {
                     val currentGroupId = "${transferGroupIdPrefix}${i}"
                     
                     val creditTx = Transaction(
-                        title = account.name, // Juste le nom
+                        title = account.name,
                         amount = totalMonthly,
                         type = "INCOME",
                         familyCategory = "Crédit",
@@ -645,7 +645,7 @@ class AccountDetailViewModel : ViewModel() {
 
                     if (account.linkedAccountId != null && !cal.before(currentMonthStart)) {
                         val debitTx = Transaction(
-                            title = account.name, // Juste le nom
+                            title = account.name,
                             amount = -totalMonthly,
                             type = "EXPENSE",
                             familyCategory = "Crédit",
@@ -764,7 +764,7 @@ class AccountDetailViewModel : ViewModel() {
                         val currentGroupId = "${transferGroupIdPrefix}${index}"
                         
                         val creditTx = Transaction(
-                            title = accountName, // Libellé épuré : juste le nom du prêt
+                            title = accountName,
                             amount = amount,
                             type = "INCOME",
                             familyCategory = "Crédit",
@@ -782,7 +782,7 @@ class AccountDetailViewModel : ViewModel() {
 
                         if (linkedAccountId != null && !date.before(currentMonthStart.time)) {
                             val debitTx = Transaction(
-                                title = accountName, // Idem sur le compte courant
+                                title = accountName,
                                 amount = -amount,
                                 type = "EXPENSE",
                                 familyCategory = "Crédit",
@@ -827,13 +827,59 @@ else {
         }
     }
 
-    fun updateLoanMetadata(accountId: String, totalCapital: Double) {
+    fun updateLoanMetadata(accountId: String, totalCapital: Double, accountName: String) {
         viewModelScope.launch {
             try {
-                db.collection("accounts").document(accountId)
-                    .update("totalAmount", totalCapital)
-                    .await()
-                _importStatus.value = "Capital emprunté mis à jour."
+                // 1. Récupérer l'ancien montant pour calculer le décalage
+                val accountRef = db.collection("accounts").document(accountId)
+                val oldAmount = accountRef.get().await().getDouble("totalAmount") ?: 0.0
+                val diff = totalCapital - oldAmount
+
+                // 2. Mettre à jour le capital emprunté
+                accountRef.update("totalAmount", totalCapital).await()
+                
+                // 3. MIGRATION : Nettoyer les libellés et ajuster le capital restant sur TOUTES les transactions
+                val selfTxs = accountRef.collection("transactions").get().await()
+                val batch = db.batch()
+                
+                selfTxs.forEach { doc ->
+                    val updates = mutableMapOf<String, Any?>()
+                    updates["title"] = accountName
+                    
+                    // Si on a un capital restant (venant du PDF), on lui applique le décalage
+                    val currentRemaining = doc.getDouble("remainingDebt")
+                    if (currentRemaining != null) {
+                        updates["remainingDebt"] = currentRemaining + diff
+                    }
+                    
+                    batch.update(doc.reference, updates)
+                }
+                
+                // Sur le compte de prélèvement (si lié)
+                val linkedId = accountRef.get().await().getString("linkedAccountId")
+                if (!linkedId.isNullOrBlank()) {
+                    val linkedAccountRef = db.collection("accounts").document(linkedId)
+                    
+                    // On scanne TOUTES les transactions du compte lié (plus sûr)
+                    val allLinkedTxs = linkedAccountRef.collection("transactions").get().await()
+                        
+                    allLinkedTxs.forEach { doc ->
+                        val title = doc.getString("title") ?: ""
+                        val targetId = doc.getString("targetAccountId")
+                        
+                        // Détection très large des anciens libellés techniques
+                        if (targetId == accountId || 
+                            title.contains("Prélèvement", ignoreCase = true) || 
+                            title.contains("Import", ignoreCase = true) ||
+                            title.contains("Mensualité", ignoreCase = true) ||
+                            title.contains("Echéance", ignoreCase = true)) {
+                            batch.update(doc.reference, "title", accountName)
+                        }
+                    }
+                }
+                
+                batch.commit().await()
+                _importStatus.value = "Capital et données synchronisés."
             } catch (e: Exception) {
                 _importStatus.value = "Erreur mise à jour : ${e.localizedMessage}"
             }

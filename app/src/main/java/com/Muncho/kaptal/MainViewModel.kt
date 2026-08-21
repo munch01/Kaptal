@@ -44,6 +44,7 @@ class MainViewModel : ViewModel() {
     private var accountsListener: ListenerRegistration? = null
     private val transactionsListeners = mutableMapOf<String, ListenerRegistration>()
     private val accountTransactionsMap = mutableMapOf<String, List<Transaction>>()
+    private var lastAccountsList: List<Account> = emptyList() // Cache pour les calculs réactifs
 
     // --- SAUVEGARDE DE LA POSITION DU PAGER PAR COMPTE ---
     private val savedPagerPositions = mutableStateMapOf<String, Int>()
@@ -297,6 +298,7 @@ class MainViewModel : ViewModel() {
                         doc.toObject(Account::class.java)?.copy(id = doc.id)
                     }.sortedBy { it.order }
 
+                    lastAccountsList = accountsList // Mise à jour du cache
                     updateTransactionsListeners(accountsList)
                 }
             }
@@ -328,7 +330,8 @@ class MainViewModel : ViewModel() {
                             }.sortedByDescending { it.date }
 
                             accountTransactionsMap[account.id] = txList
-                            recalculateBalances(accounts)
+                            // Correction : On utilise TOUJOURS la dernière liste de comptes connue
+                            recalculateBalances(lastAccountsList) 
                         }
                     }
                 transactionsListeners[account.id] = listener
@@ -340,12 +343,15 @@ class MainViewModel : ViewModel() {
 
     private fun recalculateBalances(accounts: List<Account>) {
         viewModelScope.launch(Dispatchers.Default) {
-            val balancesMap = accounts.associate { account ->
+            // Sécurité : On utilise la liste passée, mais si elle est obsolète par rapport au cache, on prend le cache
+            val targetAccounts = if (accounts.size >= lastAccountsList.size) accounts else lastAccountsList
+            
+            val balancesMap = targetAccounts.associate { account ->
                 val txs = accountTransactionsMap[account.id] ?: emptyList()
                 account.id to calculateCurrentRealBalance(account, txs)
             }
             
-            val debtsMap = accounts.filter { it.type == "CREDIT" }.associate { account ->
+            val debtsMap = targetAccounts.filter { it.type == "CREDIT" }.associate { account ->
                 val txs = accountTransactionsMap[account.id] ?: emptyList()
                 val now = Calendar.getInstance().timeInMillis
                 
@@ -367,7 +373,7 @@ class MainViewModel : ViewModel() {
             }
 
             withContext(Dispatchers.Main) {
-                _uiState.value = AccountsUiState.Success(accounts, balancesMap, debtsMap)
+                _uiState.value = AccountsUiState.Success(targetAccounts, balancesMap, debtsMap)
             }
         }
     }

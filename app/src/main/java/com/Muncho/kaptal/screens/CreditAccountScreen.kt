@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -377,7 +378,13 @@ fun CreditAccountScreen(
                         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                             SegmentedButton(
                                 selected = editMode == 0,
-                                onClick = { editMode = 0 },
+                                onClick = { 
+                                    editMode = 0
+                                    // On vide les champs pour éviter les conflits
+                                    monthlyPayment = ""
+                                    durationMonths = ""
+                                    rate = ""
+                                },
                                 shape = SegmentedButtonDefaults.itemShape(0, 2)
                             ) { Text("Capital seul", fontSize = 10.sp) }
                             SegmentedButton(
@@ -389,15 +396,31 @@ fun CreditAccountScreen(
                     }
 
                     if (editMode == 0) {
-                        Text(
-                            "Cette option met à jour le montant emprunté sans modifier vos mensualités (PDF conservé).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    "Mise à jour rapide",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    "Ajustez votre capital emprunté. Kaptal nettoiera automatiquement vos libellés existants.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         OutlinedTextField(
                             value = totalCapital, 
                             onValueChange = { totalCapital = it }, 
-                            label = { Text("Capital Emprunté (€)") }, 
+                            label = { Text("Capital Emprunté Réel (€)") }, 
+                            placeholder = { Text("Ex: 13300") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -418,7 +441,8 @@ fun CreditAccountScreen(
                         OutlinedTextField(
                             value = totalCapital, 
                             onValueChange = { totalCapital = it }, 
-                            label = { Text("Capital Emprunté (€)") }, 
+                            label = { Text("Capital Emprunté Réel (€)") }, 
+                            placeholder = { Text("Ex: 13300") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -442,7 +466,7 @@ fun CreditAccountScreen(
                 Button(onClick = {
                     if (editMode == 0) {
                         if (cVal > 0) {
-                            detailViewModel.updateLoanMetadata(account.id, cVal)
+                            detailViewModel.updateLoanMetadata(account.id, cVal, account.name)
                             showSetupDialog = false
                         }
                     } else {
