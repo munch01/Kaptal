@@ -146,7 +146,9 @@ class AccountDetailViewModel : ViewModel() {
                                     date = transaction.date,
                                     isRecurring = transaction.isRecurring,
                                     recurrenceInterval = transaction.recurrenceInterval,
-                                    endDate = transaction.endDate
+                                    endDate = transaction.endDate,
+                                    investmentEur = transaction.investmentEur,
+                                    feesPercent = transaction.feesPercent
                                 )
                                 otherAccountRef.document(doc.id).set(updatedOtherTx).await()
                             }
@@ -168,7 +170,8 @@ class AccountDetailViewModel : ViewModel() {
         isRecurring: Boolean,
         recurrenceInterval: String?,
         endDate: Timestamp?,
-        investmentEur: Double? = null // Nouveau paramètre
+        investmentEur: Double? = null,
+        feesPercent: Double? = null
     ) {
         viewModelScope.launch {
             try {
@@ -206,7 +209,8 @@ class AccountDetailViewModel : ViewModel() {
                     checkedMonths = emptyList(),
                     transferGroupId = transferGroupId,
                     targetAccountId = sourceAccountId,
-                    investmentEur = investmentEur // On stocke l'investissement sur la cible
+                    investmentEur = investmentEur,
+                    feesPercent = feesPercent
                 )
                 db.collection("accounts").document(targetAccountId).collection("transactions").add(inTx).await()
             } catch (e: Exception) {
@@ -232,7 +236,9 @@ class AccountDetailViewModel : ViewModel() {
         newRecurrenceInterval: String,
         newEndDate: Timestamp?,
         effectiveDate: Timestamp,
-        scope: RecurrenceEditScope
+        scope: RecurrenceEditScope,
+        investmentEur: Double? = null,
+        feesPercent: Double? = null
     ) {
         if (accountId.isEmpty() || oldTransaction.id.isEmpty()) return
 
@@ -253,7 +259,9 @@ class AccountDetailViewModel : ViewModel() {
                         date = newDate,
                         isRecurring = newIsRecurring,
                         recurrenceInterval = newRecurrenceInterval,
-                        endDate = newEndDate
+                        endDate = newEndDate,
+                        investmentEur = investmentEur,
+                        feesPercent = feesPercent
                     )
                     transactionsRef.document(oldTransaction.id).set(updated).await()
                     return@launch
@@ -273,7 +281,9 @@ class AccountDetailViewModel : ViewModel() {
                             date = newDate,
                             isRecurring = newIsRecurring,
                             recurrenceInterval = newRecurrenceInterval,
-                            endDate = newEndDate
+                            endDate = newEndDate,
+                            investmentEur = investmentEur,
+                            feesPercent = feesPercent
                         )
                         transactionsRef.document(oldTransaction.id).set(updated).await()
 
@@ -292,7 +302,9 @@ class AccountDetailViewModel : ViewModel() {
                                         date = newDate,
                                         isRecurring = newIsRecurring,
                                         recurrenceInterval = newRecurrenceInterval,
-                                        endDate = newEndDate
+                                        endDate = newEndDate,
+                                        investmentEur = investmentEur,
+                                        feesPercent = feesPercent
                                     )
                                     otherAccountRef.document(doc.id).set(updatedOther).await()
                                 }
@@ -314,13 +326,15 @@ class AccountDetailViewModel : ViewModel() {
                             subCategory = newSubCategory,
                             type = newType,
                             paymentMethod = newPaymentMethod,
-                            date = newDate, // Correction : on utilise la date choisie (ex: le 15) au lieu de l'effectiveDate (le 1er)
+                            date = newDate,
                             isRecurring = newIsRecurring,
                             recurrenceInterval = newRecurrenceInterval,
                             endDate = newEndDate,
                             checkedMonths = emptyList(),
                             transferGroupId = newTransferGroupId,
-                            targetAccountId = oldTransaction.targetAccountId
+                            targetAccountId = oldTransaction.targetAccountId,
+                            investmentEur = investmentEur,
+                            feesPercent = feesPercent
                         )
                         transactionsRef.add(brandNewTx).await()
 
@@ -355,7 +369,7 @@ class AccountDetailViewModel : ViewModel() {
 
                         // 2. Créer l'occurrence isolée modifiée pour ce mois précis (non récurrente)
                         val isolatedTx = Transaction(
-                            title = "Libéré du crédit (Modifié)",
+                            title = newTitle,
                             amount = newAmount,
                             familyCategory = newFamilyCategory,
                             subCategory = newSubCategory,
@@ -365,7 +379,9 @@ class AccountDetailViewModel : ViewModel() {
                             isRecurring = false,
                             checkedMonths = emptyList(),
                             transferGroupId = newTransferGroupId,
-                            targetAccountId = oldTransaction.targetAccountId
+                            targetAccountId = oldTransaction.targetAccountId,
+                            investmentEur = investmentEur,
+                            feesPercent = feesPercent
                         )
                         transactionsRef.add(isolatedTx).await()
 
@@ -872,7 +888,9 @@ else {
                             title.contains("Prélèvement", ignoreCase = true) || 
                             title.contains("Import", ignoreCase = true) ||
                             title.contains("Mensualité", ignoreCase = true) ||
-                            title.contains("Echéance", ignoreCase = true)) {
+                            title.contains("Echéance", ignoreCase = true) ||
+                            title.contains("pret", ignoreCase = true) ||
+                            title.contains("pdf", ignoreCase = true)) {
                             batch.update(doc.reference, "title", accountName)
                         }
                     }

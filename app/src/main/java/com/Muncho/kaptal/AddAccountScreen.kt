@@ -132,16 +132,45 @@ fun AddAccountScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // --- SYMBOLE CRYPTO ---
+            // --- CHOIX CRYPTO ---
             if (selectedTypeKey == "CRYPTO") {
-                OutlinedTextField(
-                    value = cryptoSymbol,
-                    onValueChange = { cryptoSymbol = it.uppercase().trim() },
-                    label = { Text("Symbole (ex: BTC, ETH)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("BTC") }
-                )
+                var expandedCrypto by remember { mutableStateOf(false) }
+                val popular = viewModel.popularCryptos
+                
+                ExposedDropdownMenuBox(
+                    expanded = expandedCrypto,
+                    onExpandedChange = { expandedCrypto = !expandedCrypto }
+                ) {
+                    OutlinedTextField(
+                        value = cryptoSymbol,
+                        onValueChange = { cryptoSymbol = it.uppercase().trim() },
+                        label = { Text("Symbole (ex: BTC, ETH)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true),
+                        placeholder = { Text("BTC") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCrypto) }
+                    )
+                    
+                    ExposedDropdownMenu(
+                        expanded = expandedCrypto,
+                        onDismissRequest = { expandedCrypto = false }
+                    ) {
+                        popular.forEach { (symbol, name) ->
+                            DropdownMenuItem(
+                                text = { 
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(symbol, fontWeight = FontWeight.Bold)
+                                        Text(name, color = Color.Gray)
+                                    }
+                                },
+                                onClick = {
+                                    cryptoSymbol = symbol
+                                    expandedCrypto = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
             // Type de compte (Tuiles) - Masqué si un seul type possible

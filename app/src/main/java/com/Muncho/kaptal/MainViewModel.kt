@@ -77,6 +77,20 @@ class MainViewModel : ViewModel() {
     private val _livretARate = MutableStateFlow(3.0) // Défaut à 3%
     val livretARate: StateFlow<Double> = _livretARate.asStateFlow()
 
+    // --- LISTE DES CRYPTOS POPULAIRES ---
+    val popularCryptos = listOf(
+        "BTC" to "Bitcoin",
+        "ETH" to "Ethereum",
+        "SOL" to "Solana",
+        "XRP" to "Ripple",
+        "ADA" to "Cardano",
+        "DOT" to "Polkadot",
+        "DOGE" to "Dogecoin",
+        "AVAX" to "Avalanche",
+        "MATIC" to "Polygon",
+        "LINK" to "Chainlink"
+    )
+
     private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
         if (firebaseAuth.currentUser != null) {
             loadAccounts()
@@ -119,17 +133,17 @@ class MainViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val rates = withContext(Dispatchers.IO) {
-                    val url = URL("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,tether,cardano,ripple&vs_currencies=eur")
+                    val ids = coinIdMap.values.joinToString(",")
+                    val url = URL("https://api.coingecko.com/api/v3/simple/price?ids=$ids&vs_currencies=eur")
                     val jsonString = url.readText()
                     val jsonObject = JSONObject(jsonString)
 
                     val map = mutableMapOf<String, Double>()
-                    if (jsonObject.has("bitcoin")) map["BTC"] = jsonObject.getJSONObject("bitcoin").getDouble("eur")
-                    if (jsonObject.has("ethereum")) map["ETH"] = jsonObject.getJSONObject("ethereum").getDouble("eur")
-                    if (jsonObject.has("solana")) map["SOL"] = jsonObject.getJSONObject("solana").getDouble("eur")
-                    if (jsonObject.has("tether")) map["USDT"] = jsonObject.getJSONObject("tether").getDouble("eur")
-                    if (jsonObject.has("cardano")) map["ADA"] = jsonObject.getJSONObject("cardano").getDouble("eur")
-                    if (jsonObject.has("ripple")) map["XRP"] = jsonObject.getJSONObject("ripple").getDouble("eur")
+                    coinIdMap.forEach { (symbol, id) ->
+                        if (jsonObject.has(id)) {
+                            map[symbol] = jsonObject.getJSONObject(id).getDouble("eur")
+                        }
+                    }
                     map
                 }
                 _cryptoRates.value = rates
@@ -147,9 +161,14 @@ class MainViewModel : ViewModel() {
         "BTC" to "bitcoin",
         "ETH" to "ethereum",
         "SOL" to "solana",
-        "USDT" to "tether",
+        "XRP" to "ripple",
         "ADA" to "cardano",
-        "XRP" to "ripple"
+        "DOT" to "polkadot",
+        "DOGE" to "dogecoin",
+        "AVAX" to "avalanche",
+        "MATIC" to "matic-network",
+        "LINK" to "chainlink",
+        "USDT" to "tether"
     )
 
     fun fetchCryptoHistory(symbol: String) {
@@ -381,16 +400,45 @@ class MainViewModel : ViewModel() {
     private fun calculateCurrentRealBalance(account: Account, transactions: List<Transaction>): Double {
         var total = account.initialBalance
         val now = Calendar.getInstance()
+        val currentYear = now.get(Calendar.YEAR)
+        val currentMonth = now.get(Calendar.MONTH)
+        val targetIndex = currentYear * 12 + currentMonth
         
-        // Version optimisée : On somme simplement les transactions pointées
-        // (La logique des dates est gérée par le fait qu'une transaction ne peut être pointée que si elle existe)
         total += transactions.sumOf { tx ->
+            val txDate = tx.date.toDate()
+            val txCal = Calendar.getInstance().apply { time = txDate }
+            val startIndex = txCal.get(Calendar.YEAR) * 12 + txCal.get(Calendar.MONTH)
+
             if (tx.isRecurring) {
-                // Pour les récurrences, on compte combien de mois ont été cochés
-                tx.amount * tx.checkedMonths.size
+                val endIndex = tx.endDate?.let {
+                    val endCal = Calendar.getInstance().apply { time = it.toDate() }
+                    endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
+                } ?: Int.MAX_VALUE
+
+                val effectiveEndIndex = minOf(targetIndex, endIndex - 1)
+
+                if (startIndex <= effectiveEndIndex) {
+                    tx.checkedMonths.count { mKey ->
+                        try {
+                            val parts = mKey.split("-")
+                            val y = parts[0].toInt()
+                            val m = parts[1].toInt() - 1
+                            val mIndex = y * 12 + m
+                            mIndex in startIndex..effectiveEndIndex
+                        } catch (e: Exception) {
+                            false
+                        }
+                    } * tx.amount
+                } else {
+                    0.0
+                }
             } else {
-                // Pour les ponctuelles, on vérifie si elle est cochée (liste non vide)
-                if (tx.checkedMonths.isNotEmpty()) tx.amount else 0.0
+                if (startIndex <= targetIndex) {
+                    val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
+                    if (tx.isCheckedForMonth(mKey)) tx.amount else 0.0
+                } else {
+                    0.0
+                }
             }
         }
 
@@ -647,9 +695,32 @@ class MainViewModel : ViewModel() {
     }
 
     fun calculateTotalInvestment(transactions: List<Transaction>): Double {
-        // Un apport crypto utilise soit investmentEur (si renseigné) soit le montant direct (ancien système)
-        return transactions.filter { it.type == "INCOME" || (it.type == "TRANSFER" && it.amount > 0) }
-            .sumOf { it.investmentEur ?: it.amount }
+        var total = 0.0
+        val now = Calendar.getInstance()
+        val currentMonthIndex = now.get(Calendar.YEAR) * 12 + now.get(Calendar.MONTH)
+
+        transactions.filter { it.type == "INCOME" || (it.type == "TRANSFER" && it.amount > 0) }.forEach { tx ->
+            val cost = tx.investmentEur ?: 0.0
+            val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+            val startIndex = txCal.get(Calendar.YEAR) * 12 + txCal.get(Calendar.MONTH)
+
+            if (tx.isRecurring) {
+                val endIndex = tx.endDate?.let {
+                    val endCal = Calendar.getInstance().apply { time = it.toDate() }
+                    endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
+                } ?: Int.MAX_VALUE
+                val effectiveEndIndex = minOf(currentMonthIndex, endIndex - 1)
+                if (startIndex <= effectiveEndIndex) {
+                    val count = (effectiveEndIndex - startIndex + 1).coerceAtLeast(0)
+                    total += cost * count
+                }
+            } else {
+                if (startIndex <= currentMonthIndex) {
+                    total += cost
+                }
+            }
+        }
+        return total
     }
 
     fun calculatePortfolioPerformance(account: Account, transactions: List<Transaction>, currentRate: Double): Pair<Double, Double> {

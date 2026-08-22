@@ -49,7 +49,8 @@ fun AddTransactionBottomSheet(
         endDate: Timestamp?,
         sourceAccountId: String,
         targetAccountId: String?,
-        investmentEur: Double? // Nouveau paramètre
+        investmentEur: Double?,
+        feesPercent: Double? // Nouveau paramètre
     ) -> Unit
 ) {
     var title by remember { mutableStateOf(initialTransaction?.title ?: "") }
@@ -58,6 +59,7 @@ fun AddTransactionBottomSheet(
     var amountText by remember { mutableStateOf(initialAbsAmount?.let { if (it == 0.0) "" else it.toString() } ?: "") }
     
     var investmentEurText by remember { mutableStateOf(initialTransaction?.investmentEur?.toString() ?: "") }
+    var feesPercentText by remember { mutableStateOf(initialTransaction?.feesPercent?.toString() ?: "0.0") }
 
     var type by remember { mutableStateOf(initialTransaction?.type ?: "EXPENSE") }
 
@@ -226,19 +228,30 @@ fun AddTransactionBottomSheet(
                 )
             }
 
-            // --- CHAMP SPÉCIFIQUE CRYPTO (Montant en €) ---
+            // --- CHAMP SPÉCIFIQUE CRYPTO (Montant en € et Frais) ---
             val currentAccount = accounts.find { it.id == currentAccountId }
             if (currentAccount?.type == "CRYPTO" && type != "EXPENSE") {
                 item {
-                    OutlinedTextField(
-                        value = investmentEurText,
-                        onValueChange = { investmentEurText = it },
-                        label = { Text("Coût de l'achat (€)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text("Ex: 500.00") }
-                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = investmentEurText,
+                            onValueChange = { investmentEurText = it },
+                            label = { Text("Coût de l'achat (€)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1.5f),
+                            singleLine = true,
+                            placeholder = { Text("Ex: 500.00") }
+                        )
+                        OutlinedTextField(
+                            value = feesPercentText,
+                            onValueChange = { feesPercentText = it },
+                            label = { Text("Frais (%)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("1.5") }
+                        )
+                    }
                 }
             }
 
@@ -546,7 +559,8 @@ fun AddTransactionBottomSheet(
                                 if (isRecurring && safeEndDate != null) Timestamp(safeEndDate) else null,
                                 finalSourceId,
                                 finalTargetId,
-                                investmentEurText.toDoubleOrNull()
+                                investmentEurText.toDoubleOrNull(),
+                                feesPercentText.toDoubleOrNull()
                             )
                             onDismiss()
                         }

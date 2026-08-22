@@ -400,8 +400,8 @@ fun HomeScreen(
             initialAccount = currentEdit,
             allAccounts = allAccounts,
             onDismiss = { accountToEdit = null },
-            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, _, linkedAccountId ->
-                viewModel.updateAccount(currentEdit.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId) {
+            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, cryptoSymbol, linkedAccountId ->
+                viewModel.updateAccount(currentEdit.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId, cryptoSymbol) {
                     if (isJoint && memberEmail.isNotBlank()) {
                         viewModel.addMemberToAccount(currentEdit.id, memberEmail) { _, message ->
                             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -504,7 +504,7 @@ fun AccountCard(
 
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
                 if (account.type == "CRYPTO") {
-                    val cryptoSymbol = "BTC" 
+                    val cryptoSymbol = account.cryptoSymbol ?: "BTC" 
                     Text(
                         text = String.format(Locale.US, "%.4f %s", currentBalance, cryptoSymbol),
                         style = MaterialTheme.typography.titleMedium,
@@ -559,6 +559,7 @@ fun AccountFormDialog(
     var bankName by remember { mutableStateOf(initialAccount?.bankName ?: "") }
     var initialBalanceText by remember { mutableStateOf(initialAccount?.initialBalance?.toString() ?: "") }
     var selectedType by remember { mutableStateOf(initialAccount?.type ?: "CHECKING") }
+    var cryptoSymbol by remember { mutableStateOf(initialAccount?.cryptoSymbol ?: "BTC") }
     var linkedAccountId by remember { mutableStateOf(initialAccount?.linkedAccountId) }
     var expandedLinkedAccount by remember { mutableStateOf(false) }
 
@@ -577,7 +578,47 @@ fun AccountFormDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(value = accountName, onValueChange = { accountName = it }, label = { Text(stringResource(R.string.account_name_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = bankName, onValueChange = { bankName = it }, label = { Text(stringResource(R.string.account_bank_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = bankName, onValueChange = { bankName = it }, label = { Text(if (selectedType == "CRYPTO") "Plateforme (ex: Binance)" else stringResource(R.string.account_bank_label)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+                if (selectedType == "CRYPTO") {
+                    var expandedCrypto by remember { mutableStateOf(false) }
+                    val popular = (viewModel<MainViewModel>()).popularCryptos
+                    
+                    ExposedDropdownMenuBox(
+                        expanded = expandedCrypto,
+                        onExpandedChange = { expandedCrypto = !expandedCrypto }
+                    ) {
+                        OutlinedTextField(
+                            value = cryptoSymbol,
+                            onValueChange = { cryptoSymbol = it.uppercase().trim() },
+                            label = { Text("Symbole (ex: BTC, ETH)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true),
+                            placeholder = { Text("BTC") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCrypto) }
+                        )
+                        
+                        ExposedDropdownMenu(
+                            expanded = expandedCrypto,
+                            onDismissRequest = { expandedCrypto = false }
+                        ) {
+                            popular.forEach { (symbol, name) ->
+                                DropdownMenuItem(
+                                    text = { 
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text(symbol, fontWeight = FontWeight.Bold)
+                                            Text(name, color = Color.Gray)
+                                        }
+                                    },
+                                    onClick = {
+                                        cryptoSymbol = symbol
+                                        expandedCrypto = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 if (selectedType == "CREDIT") {
                     ExposedDropdownMenuBox(
@@ -651,7 +692,7 @@ fun AccountFormDialog(
                 enabled = accountName.isNotBlank() && (selectedType == "CREDIT" || initialBalanceText.toDoubleOrNull() != null),
                 onClick = {
                     val initialBalance = initialBalanceText.toDoubleOrNull() ?: 0.0
-                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim(), null, linkedAccountId)
+                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim(), if (selectedType == "CRYPTO") cryptoSymbol else null, linkedAccountId)
                 }
             ) { Text(stringResource(R.string.account_save)) }
         },

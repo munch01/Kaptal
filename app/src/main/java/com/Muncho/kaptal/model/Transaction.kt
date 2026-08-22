@@ -39,7 +39,8 @@ data class Transaction(
     val interestPart: Double? = null,       // Part d'intérêts payés
     val insurancePart: Double? = null,      // Part d'assurance payée
     val remainingDebt: Double? = null,      // Capital restant dû après cette mensualité
-    val investmentEur: Double? = null       // Montant investi en euros (pour les comptes Crypto)
+    val investmentEur: Double? = null,      // Montant investi en euros (pour les comptes Crypto)
+    val feesPercent: Double? = null         // Pourcentage de frais (pour les achats Crypto)
 ) {
     /**
      * Vérifie si l'opération est pointée pour un mois donné (ex: "2026-08")

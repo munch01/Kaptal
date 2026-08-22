@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.Muncho.kaptal.AccountsUiState
 import com.Muncho.kaptal.MainViewModel
 import com.Muncho.kaptal.R
 import com.Muncho.kaptal.model.Account
@@ -42,6 +44,13 @@ fun CryptoScreen(
     val transactions by detailViewModel.transactions.collectAsState()
     val cryptoRates by mainViewModel.cryptoRates.collectAsState()
     val cryptoHistory by mainViewModel.cryptoHistory.collectAsState()
+    val uiState by mainViewModel.uiState.collectAsState()
+    
+    val allAccounts = remember(uiState) {
+        if (uiState is AccountsUiState.Success) (uiState as AccountsUiState.Success).accounts else emptyList()
+    }
+
+    var showAddSheet by remember { mutableStateOf(false) }
 
     val symbol = account.cryptoSymbol ?: "BTC"
 
@@ -60,19 +69,38 @@ fun CryptoScreen(
     val (gainLoss, gainLossPercent) = performance
 
     // Points de la courbe (Gain/Perte historique)
-    val gainLossPoints = remember(transactions, cryptoHistory) {
+    val gainLossPoints = remember(transactions, cryptoHistory, account.initialBalance) {
         if (cryptoHistory.isEmpty()) return@remember emptyList<Float>()
+        
+        val firstPrice = cryptoHistory.first().second
+        val initialQty = account.initialBalance
+        val initialCost = initialQty * firstPrice
+
         cryptoHistory.map { (timestamp, price) ->
-            // On calcule la quantité et le coût cumulés à cette date précise
-            val txsBefore = transactions.filter { it.date.toDate().time <= timestamp }
-            val qtyAtPoint = txsBefore.sumOf { it.amount }
-            // Correction : on utilise la quantité initiale si c'est la seule donnée
-            val initialQty = if (transactions.isEmpty()) account.initialBalance else 0.0
+            var qtyAtPoint = initialQty
+            var costAtPoint = initialCost
             
-            val totalQty = qtyAtPoint + initialQty
-            val costAtPoint = txsBefore.sumOf { it.investmentEur ?: (it.amount * price) } // Estimation si coût non saisi
+            transactions.forEach { tx ->
+                val txDate = tx.date.toDate()
+                val txTime = txDate.time
+                
+                if (tx.isRecurring) {
+                    val endDate = tx.endDate?.toDate()?.time ?: Long.MAX_VALUE
+                    val cal = Calendar.getInstance().apply { time = txDate }
+                    while (cal.timeInMillis <= timestamp && cal.timeInMillis < endDate) {
+                        qtyAtPoint += tx.amount
+                        costAtPoint += tx.investmentEur ?: (tx.amount * price)
+                        cal.add(Calendar.MONTH, 1)
+                    }
+                } else {
+                    if (txTime <= timestamp) {
+                        qtyAtPoint += tx.amount
+                        costAtPoint += tx.investmentEur ?: (tx.amount * price)
+                    }
+                }
+            }
             
-            val valueAtPoint = totalQty * price
+            val valueAtPoint = qtyAtPoint * price
             (valueAtPoint - costAtPoint).toFloat()
         }
     }
@@ -100,6 +128,15 @@ fun CryptoScreen(
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showAddSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Ajouter un achat",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -199,6 +236,48 @@ fun CryptoScreen(
                 }
             }
         }
+
+        if (showAddSheet) {
+            AddTransactionBottomSheet(
+                accounts = allAccounts,
+                currentAccountId = account.id,
+                categories = emptyList(), // Pas besoin de catégories standard pour crypto
+                onDismiss = { showAddSheet = false },
+                onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
+                    if (type == "TRANSFER" && targetId != null) {
+                        detailViewModel.performTransfer(
+                            sourceAccountId = sourceId,
+                            targetAccountId = targetId,
+                            amount = amount,
+                            title = title,
+                            date = date,
+                            isRecurring = isRecurring,
+                            recurrenceInterval = recurrenceInterval,
+                            endDate = endDate,
+                            investmentEur = investmentEur,
+                            feesPercent = feesPercent
+                        )
+                    } else {
+                        val newTransaction = Transaction(
+                            title = title,
+                            amount = amount,
+                            familyCategory = familyCategory,
+                            subCategory = subCategory,
+                            type = type,
+                            paymentMethod = paymentMethod,
+                            date = date,
+                            checkedMonths = emptyList(),
+                            isRecurring = isRecurring,
+                            recurrenceInterval = recurrenceInterval ?: "Mensuel",
+                            endDate = endDate,
+                            investmentEur = investmentEur,
+                            feesPercent = feesPercent
+                        )
+                        detailViewModel.addTransaction(account.id, newTransaction)
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -285,6 +364,11 @@ fun ApportItem(tx: Transaction, totalInvested: Double) {
                 // On affiche le coût réel de l'achat
                 val cost = tx.investmentEur ?: tx.amount
                 Text("%.2f €".format(cost), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                
+                if (tx.feesPercent != null && tx.feesPercent > 0) {
+                    Text("%.1f%% de frais".format(tx.feesPercent), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                }
+
                 val percentage = if (totalInvested > 0) (cost / totalInvested) * 100 else 0.0
                 Text("%.1f%% du total investi".format(percentage), style = MaterialTheme.typography.labelSmall, color = Color.Gray)
             }

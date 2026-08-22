@@ -393,7 +393,7 @@ fun StandardAccountScreen(
             currentAccountId = account.id,
             categories = categories,
             onDismiss = { showAddSheet = false },
-            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur ->
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                 if (type == "TRANSFER" && targetId != null) {
                     detailViewModel.performTransfer(
                         sourceAccountId = sourceId,
@@ -404,7 +404,8 @@ fun StandardAccountScreen(
                         isRecurring = isRecurring,
                         recurrenceInterval = recurrenceInterval,
                         endDate = endDate,
-                        investmentEur = investmentEur // À ajouter au performTransfer
+                        investmentEur = investmentEur,
+                        feesPercent = feesPercent
                     )
                 } else {
                     val newTransaction = Transaction(
@@ -419,7 +420,8 @@ fun StandardAccountScreen(
                         isRecurring = isRecurring,
                         recurrenceInterval = recurrenceInterval ?: "Mensuel",
                         endDate = endDate,
-                        investmentEur = investmentEur
+                        investmentEur = investmentEur,
+                        feesPercent = feesPercent
                     )
                     detailViewModel.addTransaction(account.id, newTransaction)
                 }
@@ -435,7 +437,7 @@ fun StandardAccountScreen(
             currentAccountId = account.id,
             categories = categories,
             onDismiss = { transactionToEdit = null },
-            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur ->
+            onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                 if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
                     detailViewModel.updateRecurringTransactionWithScope(
                         accountId = account.id,
@@ -465,7 +467,8 @@ fun StandardAccountScreen(
                         isRecurring = isRecurring,
                         recurrenceInterval = recurrenceInterval ?: transaction.recurrenceInterval,
                         endDate = endDate,
-                        investmentEur = investmentEur
+                        investmentEur = investmentEur,
+                        feesPercent = feesPercent
                     )
                     detailViewModel.updateTransaction(account.id, updatedTransaction)
                 }
@@ -813,12 +816,21 @@ fun TransactionItem(
                         }
 
                         // Titre
-                        Text(
-                            text = transaction.title ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = transaction.title ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
+                            )
+                            if (transaction.feesPercent != null && transaction.feesPercent > 0) {
+                                Text(
+                                    text = "Frais: %.1f%%".format(transaction.feesPercent),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
                     }
 
                     val isCreditDebit = transaction.type == "EXPENSE" && transaction.familyCategory == "Crédit"
