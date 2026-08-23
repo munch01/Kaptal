@@ -168,7 +168,12 @@ fun HomeScreen(
                             val filteredAccounts = remember(state.accounts, pageIndex) {
                                 when (pageIndex) {
                                     0 -> state.accounts.filter { it.type == "CHECKING" }
-                                    1 -> state.accounts.filter { it.type == "SAVINGS" || it.type == "LIVRET_A" }
+                                    1 -> state.accounts.filter { 
+                                        it.type == "SAVINGS" || 
+                                        it.type == "LIVRET_A" || 
+                                        it.type == "SAVINGS_DAILY" || 
+                                        it.type == "BROKERAGE" 
+                                    }
                                     2 -> state.accounts.filter { it.type == "CREDIT" }
                                     else -> state.accounts.filter { it.type == "CRYPTO" }
                                 }.sortedBy { it.order }
@@ -400,8 +405,8 @@ fun HomeScreen(
             initialAccount = currentEdit,
             allAccounts = allAccounts,
             onDismiss = { accountToEdit = null },
-            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, cryptoSymbol, linkedAccountId ->
-                viewModel.updateAccount(currentEdit.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId, cryptoSymbol) {
+            onConfirm = { name, bankName, initialBalance, type, isJoint, color, memberEmail, cryptoSymbol, linkedAccountId, initialInv, sRate ->
+                viewModel.updateAccount(currentEdit.id, name, bankName, initialBalance, type, isJoint, color, linkedAccountId, cryptoSymbol, initialInv, sRate) {
                     if (isJoint && memberEmail.isNotBlank()) {
                         viewModel.addMemberToAccount(currentEdit.id, memberEmail) { _, message ->
                             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -487,6 +492,9 @@ fun AccountCard(
                     Text(
                         text = when (account.type) {
                             "SAVINGS" -> stringResource(R.string.account_type_savings)
+                            "LIVRET_A" -> stringResource(R.string.account_type_livret_a)
+                            "SAVINGS_DAILY" -> "Rémunéré"
+                            "BROKERAGE" -> "Courtage"
                             "CREDIT" -> stringResource(R.string.account_type_credit)
                             "CRYPTO" -> stringResource(R.string.account_type_crypto)
                             else -> stringResource(R.string.account_type_checking)
@@ -553,13 +561,15 @@ fun AccountFormDialog(
     initialAccount: Account?,
     allAccounts: List<Account> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean, color: String, memberEmail: String, cryptoSymbol: String?, linkedAccountId: String?) -> Unit
+    onConfirm: (name: String, bankName: String, initialBalance: Double, type: String, isJoint: Boolean, color: String, memberEmail: String, cryptoSymbol: String?, linkedAccountId: String?, initialInvestmentEur: Double?, savingsRate: Double?) -> Unit
 ) {
     var accountName by remember { mutableStateOf(initialAccount?.name ?: "") }
     var bankName by remember { mutableStateOf(initialAccount?.bankName ?: "") }
     var initialBalanceText by remember { mutableStateOf(initialAccount?.initialBalance?.toString() ?: "") }
     var selectedType by remember { mutableStateOf(initialAccount?.type ?: "CHECKING") }
     var cryptoSymbol by remember { mutableStateOf(initialAccount?.cryptoSymbol ?: "BTC") }
+    var initialInvestmentText by remember { mutableStateOf(initialAccount?.initialInvestmentEur?.toString() ?: "") }
+    var savingsRateText by remember { mutableStateOf(initialAccount?.savingsRate?.toString() ?: "") }
     var linkedAccountId by remember { mutableStateOf(initialAccount?.linkedAccountId) }
     var expandedLinkedAccount by remember { mutableStateOf(false) }
 
@@ -655,10 +665,34 @@ fun AccountFormDialog(
                     OutlinedTextField(
                         value = initialBalanceText,
                         onValueChange = { initialBalanceText = it },
-                        label = { Text(stringResource(R.string.account_initial_balance)) },
+                        label = { Text(if (selectedType == "CRYPTO") "Quantité initialement détenue" else stringResource(R.string.account_initial_balance)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (selectedType == "CRYPTO") {
+                    OutlinedTextField(
+                        value = initialInvestmentText,
+                        onValueChange = { initialInvestmentText = it },
+                        label = { Text("Coût d'achat total du solde initial (€)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ex: 1250.50") }
+                    )
+                }
+
+                if (selectedType == "SAVINGS_DAILY" || selectedType == "BROKERAGE") {
+                    OutlinedTextField(
+                        value = savingsRateText,
+                        onValueChange = { savingsRateText = it },
+                        label = { Text("Taux d'intérêt annuel (%)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ex: 4.0") }
                     )
                 }
 
@@ -687,15 +721,17 @@ fun AccountFormDialog(
                 }
             }
         },
-        confirmButton = {
-            Button(
-                enabled = accountName.isNotBlank() && (selectedType == "CREDIT" || initialBalanceText.toDoubleOrNull() != null),
-                onClick = {
-                    val initialBalance = initialBalanceText.toDoubleOrNull() ?: 0.0
-                    onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim(), if (selectedType == "CRYPTO") cryptoSymbol else null, linkedAccountId)
-                }
-            ) { Text(stringResource(R.string.account_save)) }
-        },
+            confirmButton = {
+                Button(
+                    enabled = accountName.isNotBlank(),
+                    onClick = {
+                        val initialBalance = initialBalanceText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val initialInv = initialInvestmentText.replace(",", ".").toDoubleOrNull()
+                        val sRate = savingsRateText.replace(",", ".").toDoubleOrNull()
+                        onConfirm(accountName.trim(), bankName.trim(), initialBalance, selectedType, isJoint, selectedColor, memberEmail.trim(), if (selectedType == "CRYPTO") cryptoSymbol else null, linkedAccountId, initialInv, sRate)
+                    }
+                ) { Text(stringResource(R.string.account_save)) }
+            },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel_label)) } }
     )
 }

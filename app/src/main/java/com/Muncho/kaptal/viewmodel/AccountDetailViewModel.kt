@@ -175,13 +175,25 @@ class AccountDetailViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
+                val sourceAccDoc = db.collection("accounts").document(sourceAccountId).get().await()
+                val targetAccDoc = db.collection("accounts").document(targetAccountId).get().await()
+                
+                val sourceIsCrypto = sourceAccDoc.getString("type") == "CRYPTO"
+                val targetIsCrypto = targetAccDoc.getString("type") == "CRYPTO"
+                
                 val absAmount = abs(amount)
                 val transferGroupId = UUID.randomUUID().toString()
                 
+                // Si on a un investissement EUR et qu'un des comptes est crypto, on l'utilise pour le côté FIAT.
+                val fiatVal = investmentEur ?: absAmount
+                
+                val sourceVal = if (sourceIsCrypto) absAmount else fiatVal
+                val targetVal = if (targetIsCrypto) absAmount else fiatVal
+
                 // 1. Transaction sortante (débit)
                 val outTx = Transaction(
                     title = title,
-                    amount = -absAmount,
+                    amount = -sourceVal,
                     type = "TRANSFER",
                     familyCategory = "Virement",
                     subCategory = "Virement interne",
@@ -191,14 +203,15 @@ class AccountDetailViewModel : ViewModel() {
                     endDate = endDate,
                     checkedMonths = emptyList(),
                     transferGroupId = transferGroupId,
-                    targetAccountId = targetAccountId
+                    targetAccountId = targetAccountId,
+                    investmentEur = if (sourceIsCrypto) fiatVal else null
                 )
                 db.collection("accounts").document(sourceAccountId).collection("transactions").add(outTx).await()
 
                 // 2. Transaction entrante (crédit)
                 val inTx = Transaction(
                     title = title,
-                    amount = absAmount,
+                    amount = targetVal,
                     type = "TRANSFER",
                     familyCategory = "Virement",
                     subCategory = "Virement interne",
@@ -209,8 +222,8 @@ class AccountDetailViewModel : ViewModel() {
                     checkedMonths = emptyList(),
                     transferGroupId = transferGroupId,
                     targetAccountId = sourceAccountId,
-                    investmentEur = investmentEur,
-                    feesPercent = feesPercent
+                    investmentEur = if (targetIsCrypto) fiatVal else null,
+                    feesPercent = if (targetIsCrypto) feesPercent else null
                 )
                 db.collection("accounts").document(targetAccountId).collection("transactions").add(inTx).await()
             } catch (e: Exception) {
@@ -268,6 +281,7 @@ class AccountDetailViewModel : ViewModel() {
                 }
 
                 val calEff = Calendar.getInstance().apply { time = effectiveDate.toDate() }
+                val currentMonthIndex = calEff.get(Calendar.YEAR) * 12 + calEff.get(Calendar.MONTH)
 
                 when (scope) {
                     RecurrenceEditScope.ALL -> {
@@ -284,6 +298,7 @@ class AccountDetailViewModel : ViewModel() {
                             endDate = newEndDate,
                             investmentEur = investmentEur,
                             feesPercent = feesPercent
+                            // checkedMonths est préservé par copy()
                         )
                         transactionsRef.document(oldTransaction.id).set(updated).await()
 
@@ -313,12 +328,28 @@ class AccountDetailViewModel : ViewModel() {
                     }
 
                     RecurrenceEditScope.THIS_AND_FUTURE -> {
+                        // 1. On sépare les pointages
+                        val oldPointages = mutableListOf<String>()
+                        val newPointages = mutableListOf<String>()
+                        
+                        oldTransaction.checkedMonths.forEach { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                if (y * 12 + m < currentMonthIndex) oldPointages.add(mKey)
+                                else newPointages.add(mKey)
+                            } catch (e: Exception) { oldPointages.add(mKey) }
+                        }
+
+                        // 2. Mettre à jour l'ancienne série
                         transactionsRef.document(oldTransaction.id)
-                            .update("endDate", effectiveDate)
+                            .update("endDate", effectiveDate, "checkedMonths", oldPointages)
                             .await()
 
                         val newTransferGroupId = if (!oldTransaction.transferGroupId.isNullOrBlank()) UUID.randomUUID().toString() else null
 
+                        // 3. Créer la nouvelle série
                         val brandNewTx = Transaction(
                             title = newTitle,
                             amount = newAmount,
@@ -330,7 +361,7 @@ class AccountDetailViewModel : ViewModel() {
                             isRecurring = newIsRecurring,
                             recurrenceInterval = newRecurrenceInterval,
                             endDate = newEndDate,
-                            checkedMonths = emptyList(),
+                            checkedMonths = newPointages,
                             transferGroupId = newTransferGroupId,
                             targetAccountId = oldTransaction.targetAccountId,
                             investmentEur = investmentEur,
@@ -344,30 +375,51 @@ class AccountDetailViewModel : ViewModel() {
                                 .document(oldTransaction.targetAccountId)
                                 .collection("transactions")
                             
-                            // 1. Clore l'ancienne série de l'autre côté
                             val otherOldSnapshot = otherAccountRef.whereEqualTo("transferGroupId", oldTransaction.transferGroupId).get().await()
                             for (doc in otherOldSnapshot.documents) {
                                 otherAccountRef.document(doc.id).update("endDate", effectiveDate).await()
                             }
 
-                            // 2. Créer la nouvelle série de l'autre côté
                             val otherNewTx = brandNewTx.copy(
-                                amount = -newAmount, // Inverser
-                                targetAccountId = accountId // Pointer vers le compte actuel
+                                amount = -newAmount,
+                                targetAccountId = accountId,
+                                checkedMonths = emptyList() // On ne copie pas les pointages sur l'autre compte car c'est géré par l'utilisateur
                             )
                             otherAccountRef.add(otherNewTx).await()
                         }
                     }
 
                     RecurrenceEditScope.THIS_ONLY -> {
+                        val currentMonthKey = String.format(Locale.US, "%d-%02d", calEff.get(Calendar.YEAR), calEff.get(Calendar.MONTH) + 1)
+                        val isThisMonthChecked = oldTransaction.isCheckedForMonth(currentMonthKey)
+                        
                         // 1. La série d'origine s'arrête juste avant ce mois
+                        val oldPointages = oldTransaction.checkedMonths.filter { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                y * 12 + m < currentMonthIndex
+                            } catch (e: Exception) { true }
+                        }
+                        
+                        // 3. Pointages pour la reprise du futur
+                        val futurePointages = oldTransaction.checkedMonths.filter { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                y * 12 + m > currentMonthIndex
+                            } catch (e: Exception) { false }
+                        }
+
                         transactionsRef.document(oldTransaction.id)
-                            .update("endDate", effectiveDate)
+                            .update("endDate", effectiveDate, "checkedMonths", oldPointages)
                             .await()
 
                         val newTransferGroupId = if (!oldTransaction.transferGroupId.isNullOrBlank()) UUID.randomUUID().toString() else null
 
-                        // 2. Créer l'occurrence isolée modifiée pour ce mois précis (non récurrente)
+                        // 2. Créer l'occurrence isolée
                         val isolatedTx = Transaction(
                             title = newTitle,
                             amount = newAmount,
@@ -377,7 +429,7 @@ class AccountDetailViewModel : ViewModel() {
                             paymentMethod = newPaymentMethod,
                             date = newDate, 
                             isRecurring = false,
-                            checkedMonths = emptyList(),
+                            checkedMonths = if (isThisMonthChecked) listOf(currentMonthKey) else emptyList(),
                             transferGroupId = newTransferGroupId,
                             targetAccountId = oldTransaction.targetAccountId,
                             investmentEur = investmentEur,
@@ -385,7 +437,7 @@ class AccountDetailViewModel : ViewModel() {
                         )
                         transactionsRef.add(isolatedTx).await()
 
-                        // 3. Reprendre la série initiale le mois suivant pour préserver le futur
+                        // 3. Reprendre la série initiale le mois suivant
                         val futureCal = (calEff.clone() as Calendar).apply {
                             add(Calendar.MONTH, 1)
                         }
@@ -395,34 +447,25 @@ class AccountDetailViewModel : ViewModel() {
                             id = "",
                             date = futureTimestamp,
                             endDate = oldTransaction.endDate,
-                            checkedMonths = emptyList()
+                            checkedMonths = futurePointages
                         )
                         transactionsRef.add(remainingSeriesTx).await()
 
-                        // Sync l'autre côté si c'est un virement
+                        // Sync l'autre côté...
                         if (!oldTransaction.transferGroupId.isNullOrBlank() && !oldTransaction.targetAccountId.isNullOrBlank()) {
                             val otherAccountRef = db.collection("accounts")
                                 .document(oldTransaction.targetAccountId)
                                 .collection("transactions")
                             
-                            // 1. Clore l'ancienne série de l'autre côté
                             val otherOldSnapshot = otherAccountRef.whereEqualTo("transferGroupId", oldTransaction.transferGroupId).get().await()
                             for (doc in otherOldSnapshot.documents) {
                                 otherAccountRef.document(doc.id).update("endDate", effectiveDate).await()
                             }
 
-                            // 2. Créer l'occurrence isolée de l'autre côté
-                            val otherIsolatedTx = isolatedTx.copy(
-                                amount = -newAmount,
-                                targetAccountId = accountId
-                            )
+                            val otherIsolatedTx = isolatedTx.copy(amount = -newAmount, targetAccountId = accountId, checkedMonths = emptyList())
                             otherAccountRef.add(otherIsolatedTx).await()
 
-                            // 3. Reprendre la série de l'autre côté
-                            val otherRemainingSeriesTx = remainingSeriesTx.copy(
-                                amount = -remainingSeriesTx.amount,
-                                targetAccountId = accountId
-                            )
+                            val otherRemainingSeriesTx = remainingSeriesTx.copy(amount = -remainingSeriesTx.amount, targetAccountId = accountId, checkedMonths = emptyList())
                             otherAccountRef.add(otherRemainingSeriesTx).await()
                         }
                     }
@@ -472,6 +515,7 @@ class AccountDetailViewModel : ViewModel() {
                 }
 
                 val calEff = Calendar.getInstance().apply { time = effectiveDate.toDate() }
+                val currentMonthIndex = calEff.get(Calendar.YEAR) * 12 + calEff.get(Calendar.MONTH)
 
                 when (scope) {
                     RecurrenceEditScope.ALL -> {
@@ -490,11 +534,21 @@ class AccountDetailViewModel : ViewModel() {
                     }
 
                     RecurrenceEditScope.THIS_AND_FUTURE -> {
+                        // On garde les pointages passés uniquement
+                        val oldPointages = transaction.checkedMonths.filter { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                y * 12 + m < currentMonthIndex
+                            } catch (e: Exception) { true }
+                        }
+
                         transactionsRef.document(transaction.id)
-                            .update("endDate", effectiveDate)
+                            .update("endDate", effectiveDate, "checkedMonths", oldPointages)
                             .await()
                         
-                        // Sync l'autre côté si c'est un virement
+                        // Sync l'autre côté
                         if (!transaction.transferGroupId.isNullOrBlank() && !transaction.targetAccountId.isNullOrBlank()) {
                             val otherAccountRef = db.collection("accounts")
                                 .document(transaction.targetAccountId)
@@ -508,11 +562,30 @@ class AccountDetailViewModel : ViewModel() {
 
                     RecurrenceEditScope.THIS_ONLY -> {
                         // 1. Arrêter la série initiale juste avant ce mois
+                        val oldPointages = transaction.checkedMonths.filter { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                y * 12 + m < currentMonthIndex
+                            } catch (e: Exception) { true }
+                        }
+
+                        // Pointages pour le futur (après ce mois)
+                        val futurePointages = transaction.checkedMonths.filter { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                y * 12 + m > currentMonthIndex
+                            } catch (e: Exception) { false }
+                        }
+
                         transactionsRef.document(transaction.id)
-                            .update("endDate", effectiveDate)
+                            .update("endDate", effectiveDate, "checkedMonths", oldPointages)
                             .await()
 
-                        // 2. Reprendre la série le mois suivant pour préserver le futur sans ce mois-là
+                        // 2. Reprendre la série le mois suivant
                         val futureCal = (calEff.clone() as Calendar).apply {
                             add(Calendar.MONTH, 1)
                         }
@@ -522,27 +595,22 @@ class AccountDetailViewModel : ViewModel() {
                             id = "",
                             date = futureTimestamp,
                             endDate = transaction.endDate,
-                            checkedMonths = emptyList()
+                            checkedMonths = futurePointages
                         )
                         transactionsRef.add(remainingSeriesTx).await()
 
-                        // Sync l'autre côté si c'est un virement
+                        // Sync l'autre côté...
                         if (!transaction.transferGroupId.isNullOrBlank() && !transaction.targetAccountId.isNullOrBlank()) {
                             val otherAccountRef = db.collection("accounts")
                                 .document(transaction.targetAccountId)
                                 .collection("transactions")
                             
-                            // 1. Clore l'ancienne série de l'autre côté
                             val otherOldSnapshot = otherAccountRef.whereEqualTo("transferGroupId", transaction.transferGroupId).get().await()
                             for (doc in otherOldSnapshot.documents) {
                                 otherAccountRef.document(doc.id).update("endDate", effectiveDate).await()
                             }
 
-                            // 2. Reprendre la série de l'autre côté
-                            val otherRemainingSeriesTx = remainingSeriesTx.copy(
-                                amount = -remainingSeriesTx.amount,
-                                targetAccountId = accountId
-                            )
+                            val otherRemainingSeriesTx = remainingSeriesTx.copy(amount = -remainingSeriesTx.amount, targetAccountId = accountId, checkedMonths = emptyList())
                             otherAccountRef.add(otherRemainingSeriesTx).await()
                         }
                     }

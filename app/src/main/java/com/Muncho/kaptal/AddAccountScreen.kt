@@ -38,16 +38,22 @@ fun AddAccountScreen(
         color: String,
         linkedAccountId: String?,
         memberEmail: String?,
-        cryptoSymbol: String? // Nouveau paramètre
+        cryptoSymbol: String?,
+        initialInvestmentEur: Double?,
+        savingsRate: Double? // Nouveau paramètre
     ) -> Unit
 ) {
     var accountName by remember { mutableStateOf("") }
     var bankName by remember { mutableStateOf("") }
-    var initialBalance by remember { mutableStateOf("") }
+    var initialBalanceText by remember { mutableStateOf("") }
+    var initialInvestmentText by remember { mutableStateOf("") }
+    var savingsRateText by remember { mutableStateOf("") }
 
     val typeChecking = stringResource(R.string.account_type_checking)
     val typeSavings = stringResource(R.string.account_type_savings)
     val typeLivretA = stringResource(R.string.account_type_livret_a)
+    val typeSavingsDaily = "Rémunéré (Quotidien)"
+    val typeBrokerage = "Courtage"
     val typeCredit = stringResource(R.string.account_type_credit)
     val typeCrypto = stringResource(R.string.account_type_crypto)
 
@@ -55,6 +61,8 @@ fun AddAccountScreen(
         "CHECKING" to typeChecking,
         "SAVINGS" to typeSavings,
         "LIVRET_A" to typeLivretA,
+        "SAVINGS_DAILY" to typeSavingsDaily,
+        "BROKERAGE" to typeBrokerage,
         "CREDIT" to typeCredit,
         "CRYPTO" to typeCrypto
     )
@@ -62,7 +70,12 @@ fun AddAccountScreen(
     // Logique de filtrage des types selon le contexte
     val filteredTypes = remember(initialTypeKey) {
         when (initialTypeKey) {
-            "SAVINGS" -> listOf("SAVINGS" to typeSavings, "LIVRET_A" to typeLivretA)
+            "SAVINGS" -> listOf(
+                "SAVINGS" to typeSavings, 
+                "LIVRET_A" to typeLivretA, 
+                "SAVINGS_DAILY" to typeSavingsDaily, 
+                "BROKERAGE" to typeBrokerage
+            )
             "CHECKING" -> listOf("CHECKING" to typeChecking)
             "CREDIT" -> listOf("CREDIT" to typeCredit)
             "CRYPTO" -> listOf("CRYPTO" to typeCrypto)
@@ -228,13 +241,37 @@ fun AddAccountScreen(
             // Solde initial (Caché pour les crédits)
             if (selectedTypeKey != "CREDIT") {
                 OutlinedTextField(
-                    value = initialBalance,
-                    onValueChange = { initialBalance = it; if (it.isNotBlank()) balanceError = false },
-                    label = { Text(stringResource(R.string.account_initial_balance)) },
+                    value = initialBalanceText,
+                    onValueChange = { initialBalanceText = it; if (it.isNotBlank()) balanceError = false },
+                    label = { Text(if (selectedTypeKey == "CRYPTO") "Quantité initialement détenue" else stringResource(R.string.account_initial_balance)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     isError = balanceError,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (selectedTypeKey == "CRYPTO") {
+                OutlinedTextField(
+                    value = initialInvestmentText,
+                    onValueChange = { initialInvestmentText = it },
+                    label = { Text("Coût d'achat total du solde initial (€)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Ex: 1250.50") }
+                )
+            }
+
+            if (selectedTypeKey == "SAVINGS_DAILY" || selectedTypeKey == "BROKERAGE") {
+                OutlinedTextField(
+                    value = savingsRateText,
+                    onValueChange = { savingsRateText = it },
+                    label = { Text("Taux d'intérêt annuel (%)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Ex: 4.0") }
                 )
             }
 
@@ -276,11 +313,12 @@ fun AddAccountScreen(
             // Bouton de validation
             Button(
                 onClick = {
-                    val parsedBalance = if (selectedTypeKey == "CREDIT") 0.0 else initialBalance.replace(",", ".").toDoubleOrNull() ?: 0.0
+                    val parsedBalance = if (selectedTypeKey == "CREDIT") 0.0 else initialBalanceText.replace(",", ".").toDoubleOrNull() ?: 0.0
                     nameError = accountName.isBlank()
-                    balanceError = selectedTypeKey != "CREDIT" && initialBalance.isBlank()
+                    // On n'oblige plus le solde à être rempli (par défaut 0.0)
+                    balanceError = false 
 
-                    if (!nameError && (!balanceError || selectedTypeKey == "CREDIT")) {
+                    if (!nameError) {
                         onAccountAdded(
                             accountName.trim(),
                             bankName.trim(),
@@ -290,7 +328,9 @@ fun AddAccountScreen(
                             selectedColor,
                             linkedAccountId,
                             if (isJoint) memberEmail.trim() else null,
-                            if (selectedTypeKey == "CRYPTO") cryptoSymbol else null
+                            if (selectedTypeKey == "CRYPTO") cryptoSymbol else null,
+                            if (selectedTypeKey == "CRYPTO") initialInvestmentText.replace(",", ".").toDoubleOrNull() else null,
+                            savingsRateText.replace(",", ".").toDoubleOrNull()
                         )
                     }
                 },

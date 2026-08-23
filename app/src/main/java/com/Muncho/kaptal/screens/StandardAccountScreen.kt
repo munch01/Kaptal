@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -53,13 +54,14 @@ fun StandardAccountScreen(
 ) {
     val transactions by detailViewModel.transactions.collectAsState()
     val livretARate by mainViewModel.livretARate.collectAsState()
+    val cryptoRates by mainViewModel.cryptoRates.collectAsState()
     val categories = viewModel<SettingsViewModel>().userCategories
 
     var showAddSheet by remember { mutableStateOf(false) }
     var showChartSheet by remember { mutableStateOf(false) }
     var transactionToEdit by remember { mutableStateOf<Pair<Transaction, Pair<Timestamp?, RecurrenceEditScope>>?>(null) }
     var transactionToDelete by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
-    var showEditChoiceDialog by remember { mutableStateOf<Pair<Transaction, Timestamp>?>(null) }
+    var showEditChoiceDialog by remember { mutableStateOf<Triple<Transaction, Transaction, Timestamp>?>(null) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -167,10 +169,17 @@ fun StandardAccountScreen(
                     val month = totalMonths % 12
 
                     Column {
-                        if (account.type == "LIVRET_A") {
-                            val estimatedInterests = remember(transactions, livretARate) {
-                                mainViewModel.calculateLivretAInterests(account, transactions, livretARate)
+                        if (account.type == "LIVRET_A" || account.type == "SAVINGS_DAILY" || account.type == "BROKERAGE") {
+                            val rate = if (account.type == "LIVRET_A") livretARate else (account.savingsRate ?: 0.0)
+                            
+                            val estimatedInterests = remember(transactions, rate, account.type) {
+                                when (account.type) {
+                                    "LIVRET_A" -> mainViewModel.calculateLivretAInterests(account, transactions, rate)
+                                    "SAVINGS_DAILY" -> mainViewModel.calculateDailyInterests(account, transactions, rate)
+                                    else -> 0.0 // Courtage : Affiché via la courbe de projection
+                                }
                             }
+
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4).copy(alpha = 0.9f)),
@@ -178,20 +187,47 @@ fun StandardAccountScreen(
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(stringResource(R.string.livret_a_interests_title), fontWeight = FontWeight.Bold, color = Color(0xFFF57F17))
-                                        Text(stringResource(R.string.livret_a_rate_label, livretARate.toString()), style = MaterialTheme.typography.bodySmall, color = Color(0xFFF57F17))
+                                        Text(
+                                            if (account.type == "BROKERAGE") "Projection (12 mois)" else stringResource(R.string.livret_a_interests_title), 
+                                            fontWeight = FontWeight.Bold, color = Color(0xFFF57F17)
+                                        )
+                                        Text(stringResource(R.string.livret_a_rate_label, rate.toString()), style = MaterialTheme.typography.bodySmall, color = Color(0xFFF57F17))
                                     }
-                                    Text("+ %.2f €".format(estimatedInterests), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
-                                    Text(stringResource(R.string.livret_a_rule_notice), style = MaterialTheme.typography.labelSmall)
+                                    
+                                    if (account.type == "BROKERAGE") {
+                                        val projections = remember(transactions, rate) { 
+                                            mainViewModel.calculateProjections(account, transactions, rate) 
+                                        }
+                                        val points = projections.map { it.second.toFloat() }
+                                        
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Box(modifier = Modifier.fillMaxWidth().height(100.dp)) {
+                                            ProjectionCurve(points)
+                                        }
+                                        Text(
+                                            "Solde estimé dans 1 an : %.2f €".format(projections.last().second),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    } else {
+                                        Text("+ %.2f €".format(estimatedInterests), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = Color(0xFF2E7D32))
+                                        Text(
+                                            if (account.type == "LIVRET_A") stringResource(R.string.livret_a_rule_notice) else "Calculé au jour le jour",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
                                 }
                             }
                         }
 
                         MonthPageContent(
+                            account = account,
                             initialBalance = account.initialBalance,
                             year = year,
                             month = month,
                             transactions = transactions,
+                            mainViewModel = mainViewModel,
                             onCheckedChange = { transactionId, monthKey, isChecked ->
                                 detailViewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
                             },
@@ -212,7 +248,7 @@ fun StandardAccountScreen(
                                 val visualTransaction = transaction.copy(date = Timestamp(visualCal.time))
 
                                 if (transaction.isRecurring) {
-                                    showEditChoiceDialog = Pair(visualTransaction, pivotTimestamp)
+                                    showEditChoiceDialog = Triple(transaction, visualTransaction, pivotTimestamp)
                                 } else {
                                     transactionToEdit = Pair(transaction, Pair(null, RecurrenceEditScope.ALL))
                                 }
@@ -246,7 +282,7 @@ fun StandardAccountScreen(
         }
     }
 
-    showEditChoiceDialog?.let { (transaction, effectiveDate) ->
+    showEditChoiceDialog?.let { (originalTx, visualTx, effectiveDate) ->
         AlertDialog(
             onDismissRequest = { showEditChoiceDialog = null },
             title = { Text(stringResource(R.string.recurrence_edit_title)) },
@@ -259,7 +295,16 @@ fun StandardAccountScreen(
                     TextButton(
                         onClick = {
                             showEditChoiceDialog = null
-                            transactionToEdit = Pair(transaction, Pair(effectiveDate, RecurrenceEditScope.THIS_AND_FUTURE))
+                            transactionToEdit = Pair(originalTx, Pair(effectiveDate, RecurrenceEditScope.ALL))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.recurrence_all))
+                    }
+                    TextButton(
+                        onClick = {
+                            showEditChoiceDialog = null
+                            transactionToEdit = Pair(visualTx, Pair(effectiveDate, RecurrenceEditScope.THIS_AND_FUTURE))
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -268,7 +313,7 @@ fun StandardAccountScreen(
                     TextButton(
                         onClick = {
                             showEditChoiceDialog = null
-                            transactionToEdit = Pair(transaction, Pair(effectiveDate, RecurrenceEditScope.THIS_ONLY))
+                            transactionToEdit = Pair(visualTx, Pair(effectiveDate, RecurrenceEditScope.THIS_ONLY))
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -392,6 +437,7 @@ fun StandardAccountScreen(
             accounts = allAccounts,
             currentAccountId = account.id,
             categories = categories,
+            cryptoRates = cryptoRates,
             onDismiss = { showAddSheet = false },
             onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                 if (type == "TRANSFER" && targetId != null) {
@@ -436,6 +482,7 @@ fun StandardAccountScreen(
             accounts = allAccounts,
             currentAccountId = account.id,
             categories = categories,
+            cryptoRates = cryptoRates,
             onDismiss = { transactionToEdit = null },
             onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                 if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
@@ -453,7 +500,9 @@ fun StandardAccountScreen(
                         newRecurrenceInterval = recurrenceInterval ?: "Mensuel",
                         newEndDate = endDate,
                         effectiveDate = effectiveDate,
-                        scope = scope
+                        scope = scope,
+                        investmentEur = investmentEur,
+                        feesPercent = feesPercent
                     )
                 } else {
                     val updatedTransaction = transaction.copy(
@@ -482,10 +531,12 @@ fun StandardAccountScreen(
 
 @Composable
 fun MonthPageContent(
+    account: Account,
     initialBalance: Double,
     year: Int,
     month: Int,
     transactions: List<Transaction>,
+    mainViewModel: MainViewModel,
     onCheckedChange: (String, String, Boolean) -> Unit,
     onEditClick: (Transaction) -> Unit,
     onDeleteClick: (Transaction) -> Unit
@@ -510,11 +561,11 @@ fun MonthPageContent(
     }
 
     val realBalance = remember(transactions, year, month, initialBalance) {
-        computeCumulativeBalance(initialBalance, transactions, year, month, onlyChecked = true)
+        computeCumulativeBalance(account, initialBalance, transactions, year, month, onlyChecked = true, mainViewModel = mainViewModel)
     }
 
     val projectedBalance = remember(transactions, year, month, initialBalance) {
-        computeCumulativeBalance(initialBalance, transactions, year, month, onlyChecked = false)
+        computeCumulativeBalance(account, initialBalance, transactions, year, month, onlyChecked = false, mainViewModel = mainViewModel)
     }
 
     val positiveColor = Color(0xFF2E7D32)
@@ -635,16 +686,19 @@ fun MonthPageContent(
 
 
 private fun computeCumulativeBalance(
+    account: Account,
     initialBalance: Double,
     transactions: List<Transaction>,
     targetYear: Int,
     targetMonth: Int,
-    onlyChecked: Boolean
+    onlyChecked: Boolean,
+    mainViewModel: MainViewModel
 ): Double {
-    if (transactions.isEmpty()) return initialBalance
-
     val targetIndex = targetYear * 12 + targetMonth
     var total = initialBalance
+    
+    val isCrypto = account.type == "CRYPTO"
+    val isSavings = account.type == "LIVRET_A" || account.type == "SAVINGS_DAILY" || account.type == "BROKERAGE"
 
     for (tx in transactions) {
         val txDate = tx.date.toDate()
@@ -660,8 +714,7 @@ private fun computeCumulativeBalance(
             val effectiveEndIndex = minOf(targetIndex, endIndex - 1)
 
             if (startIndex <= effectiveEndIndex) {
-                if (onlyChecked) {
-                    // Si on ne veut que les pointés, on itère sur les mois cochés
+                if (onlyChecked && !isCrypto) {
                     for (mKey in tx.checkedMonths) {
                         try {
                             val parts = mKey.split("-")
@@ -674,14 +727,13 @@ private fun computeCumulativeBalance(
                         } catch (e: Exception) {}
                     }
                 } else {
-                    // Si on veut tout, calcul mathématique simple sans boucle
-                    val count = (effectiveEndIndex - startIndex + 1)
+                    val count = (effectiveEndIndex - startIndex + 1).coerceAtLeast(0)
                     total += tx.amount * count
                 }
             }
         } else {
             if (startIndex <= targetIndex) {
-                if (onlyChecked) {
+                if (onlyChecked && !isCrypto) {
                     val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
                     if (tx.isCheckedForMonth(mKey)) total += tx.amount
                 } else {
@@ -691,7 +743,47 @@ private fun computeCumulativeBalance(
         }
     }
 
+    if (isSavings) {
+        val rate = if (account.type == "LIVRET_A") 3.0 else (account.savingsRate ?: 0.0)
+        if (rate > 0) {
+            val interests = if (account.type == "LIVRET_A") {
+                mainViewModel.calculateLivretAInterests(account, transactions, rate, targetYear, targetMonth, onlyChecked)
+            } else {
+                mainViewModel.calculateDailyInterests(account, transactions, rate, targetYear, targetMonth, onlyChecked)
+            }
+            total += interests
+        }
+    }
+
     return total
+}
+
+@Composable
+fun ProjectionCurve(points: List<Float>) {
+    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+        if (points.size < 2) return@Canvas
+        
+        val width = size.width
+        val height = size.height
+        val minVal = points.minOrNull() ?: 0f
+        val maxVal = points.maxOrNull() ?: 0f
+        val range = (maxVal - minVal).coerceAtLeast(1f)
+        
+        val path = androidx.compose.ui.graphics.Path()
+        val stepX = width / (points.size - 1)
+        
+        points.forEachIndexed { i, value ->
+            val x = i * stepX
+            val y = height - ((value - minVal) / range) * height
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        
+        drawPath(
+            path = path,
+            color = Color(0xFFF57F17),
+            style = Stroke(width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+        )
+    }
 }
 
 

@@ -32,6 +32,7 @@ import com.Muncho.kaptal.model.Transaction
 import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,21 +61,27 @@ fun CryptoScreen(
     }
 
     val currentRate = cryptoRates[symbol] ?: 0.0
-    val totalInvested = remember(transactions) { mainViewModel.calculateTotalInvestment(transactions) }
+    val firstHistoryPrice = remember(cryptoHistory) { cryptoHistory.firstOrNull()?.second ?: 0.0 }
+    
+    val totalInvested = remember(transactions, firstHistoryPrice) { 
+        mainViewModel.calculateTotalInvestment(account, transactions, firstHistoryPrice) 
+    }
     
     // Performance calculée en direct sur le taux actuel
-    val performance = remember(transactions, currentRate) { 
-        mainViewModel.calculatePortfolioPerformance(account, transactions, currentRate) 
+    val performance = remember(transactions, currentRate, firstHistoryPrice) { 
+        mainViewModel.calculatePortfolioPerformance(account, transactions, currentRate, firstHistoryPrice) 
     }
     val (gainLoss, gainLossPercent) = performance
 
     // Points de la courbe (Gain/Perte historique)
-    val gainLossPoints = remember(transactions, cryptoHistory, account.initialBalance) {
+    val gainLossPoints = remember(transactions, cryptoHistory, account.initialBalance, account.initialInvestmentEur) {
         if (cryptoHistory.isEmpty()) return@remember emptyList<Float>()
         
         val firstPrice = cryptoHistory.first().second
         val initialQty = account.initialBalance
-        val initialCost = initialQty * firstPrice
+        // Si l'utilisateur a saisi un coût d'achat initial, on l'utilise, 
+        // sinon on part du principe que la PV est de 0 au début de l'historique (30j)
+        val initialCost = account.initialInvestmentEur ?: (initialQty * firstPrice)
 
         cryptoHistory.map { (timestamp, price) ->
             var qtyAtPoint = initialQty
@@ -84,18 +91,24 @@ fun CryptoScreen(
                 val txDate = tx.date.toDate()
                 val txTime = txDate.time
                 
+                // Pour chaque transaction, on détermine son "prix d'achat" pour la courbe
+                // On essaie de trouver le prix le plus proche dans l'historique si investmentEur est nul
+                val txPurchasePrice = tx.investmentEur?.let { if (tx.amount != 0.0) it / abs(tx.amount) else 0.0 }
+                    ?: cryptoHistory.minByOrNull { Math.abs(it.first - txTime) }?.second 
+                    ?: price
+
                 if (tx.isRecurring) {
                     val endDate = tx.endDate?.toDate()?.time ?: Long.MAX_VALUE
                     val cal = Calendar.getInstance().apply { time = txDate }
                     while (cal.timeInMillis <= timestamp && cal.timeInMillis < endDate) {
                         qtyAtPoint += tx.amount
-                        costAtPoint += tx.investmentEur ?: (tx.amount * price)
+                        costAtPoint += tx.amount * txPurchasePrice
                         cal.add(Calendar.MONTH, 1)
                     }
                 } else {
                     if (txTime <= timestamp) {
                         qtyAtPoint += tx.amount
-                        costAtPoint += tx.investmentEur ?: (tx.amount * price)
+                        costAtPoint += tx.amount * txPurchasePrice
                     }
                 }
             }
@@ -242,6 +255,7 @@ fun CryptoScreen(
                 accounts = allAccounts,
                 currentAccountId = account.id,
                 categories = emptyList(), // Pas besoin de catégories standard pour crypto
+                cryptoRates = cryptoRates,
                 onDismiss = { showAddSheet = false },
                 onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                     if (type == "TRANSFER" && targetId != null) {

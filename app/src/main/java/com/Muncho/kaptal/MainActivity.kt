@@ -199,7 +199,7 @@ fun KaptalApp(
                     onAccountClick = { account ->
                         val route = when (account.type) {
                             "CREDIT" -> "credit_detail"
-                            "LIVRET_A" -> "livret_a_detail"
+                            "LIVRET_A", "SAVINGS_DAILY", "BROKERAGE" -> "livret_a_detail"
                             "CRYPTO" -> "crypto_detail"
                             else -> "standard_detail"
                         }
@@ -220,7 +220,7 @@ fun KaptalApp(
                     onBackClick = { navController.popBackStack() },
                     viewModel = viewModel,
                     initialTypeKey = typeKey,
-                    onAccountAdded = { name, bank, balance, type, isJoint, color, linkedId, memberEmail, cryptoSymbol ->
+                    onAccountAdded = { name, bank, balance, type, isJoint, color, linkedId, memberEmail, cryptoSymbol, initialInv, sRate ->
                         viewModel.addAccount(
                             name = name,
                             bankName = bank,
@@ -229,7 +229,9 @@ fun KaptalApp(
                             isJoint = isJoint,
                             color = color,
                             linkedAccountId = linkedId,
-                            cryptoSymbol = cryptoSymbol
+                            cryptoSymbol = cryptoSymbol,
+                            initialInvestmentEur = initialInv,
+                            savingsRate = sRate
                         ) { accountId ->
                             if (isJoint && !memberEmail.isNullOrBlank()) {
                                 viewModel.addMemberToAccount(accountId, memberEmail) { _, _ -> }

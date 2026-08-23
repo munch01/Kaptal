@@ -194,27 +194,145 @@ class MainViewModel : ViewModel() {
     }
 
     /**
+     * Calcule les intérêts pour un compte à rémunération journalière
+     */
+    fun calculateDailyInterests(
+        account: Account, 
+        transactions: List<Transaction>, 
+        rate: Double,
+        untilYear: Int? = null,
+        untilMonth: Int? = null,
+        onlyChecked: Boolean = true
+    ): Double {
+        val now = Calendar.getInstance()
+        val currentYear = untilYear ?: now.get(Calendar.YEAR)
+        
+        var totalInterests = 0.0
+        val dailyRate = (rate / 100.0) / 365.0
+        
+        val cal = Calendar.getInstance().apply {
+            set(currentYear, Calendar.JANUARY, 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        
+        val endCal = Calendar.getInstance()
+        if (untilYear != null && untilMonth != null) {
+            endCal.set(untilYear, untilMonth, 1)
+            endCal.set(Calendar.DAY_OF_MONTH, endCal.getActualMaximum(Calendar.DAY_OF_MONTH))
+        }
+        
+        // On ne calcule pas au delà d'aujourd'hui pour le "réel"
+        val limitCal = if (onlyChecked) now else endCal
+        
+        while (cal.before(limitCal)) {
+            val balance = calculateBalanceAtDate(account, transactions, cal.time, onlyChecked)
+            if (balance > 0) {
+                totalInterests += balance * dailyRate
+            }
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        
+        return totalInterests
+    }
+
+    /**
+     * Génère des points de projection pour une courbe (sur 12 mois)
+     */
+    fun calculateProjections(account: Account, transactions: List<Transaction>, rate: Double): List<Pair<Long, Double>> {
+        val list = mutableListOf<Pair<Long, Double>>()
+        val cal = Calendar.getInstance()
+        val startBalance = calculateCurrentRealBalance(account, transactions)
+        
+        var currentProjectedBalance = startBalance
+        val monthlyRate = (rate / 100.0) / 12.0
+        
+        // Point actuel
+        list.add(cal.timeInMillis to currentProjectedBalance)
+        
+        for (i in 1..12) {
+            cal.add(Calendar.MONTH, 1)
+            currentProjectedBalance += (currentProjectedBalance * monthlyRate)
+            
+            // Impact des transactions récurrentes pour la projection
+            transactions.filter { it.isRecurring }.forEach { tx ->
+                if (isTransactionActiveInMonth(tx, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH))) {
+                    currentProjectedBalance += tx.amount
+                }
+            }
+            
+            list.add(cal.timeInMillis to currentProjectedBalance)
+        }
+        
+        return list
+    }
+
+    private fun calculateBalanceAtDate(account: Account, transactions: List<Transaction>, date: Date, onlyChecked: Boolean): Double {
+        var balance = account.initialBalance
+        val targetTime = date.time
+        
+        val cal = Calendar.getInstance()
+        
+        for (tx in transactions) {
+            val txDate = tx.date.toDate()
+            if (tx.isRecurring) {
+                val iterCal = Calendar.getInstance().apply { time = txDate }
+                val endDate = tx.endDate?.toDate()?.time ?: Long.MAX_VALUE
+                while (iterCal.timeInMillis <= targetTime && iterCal.timeInMillis < endDate) {
+                    val mKey = String.format(Locale.US, "%d-%02d", iterCal.get(Calendar.YEAR), iterCal.get(Calendar.MONTH) + 1)
+                    if (!onlyChecked || tx.isCheckedForMonth(mKey)) {
+                        balance += tx.amount
+                    }
+                    iterCal.add(Calendar.MONTH, 1)
+                }
+            } else {
+                if (txDate.time <= targetTime) {
+                    val txCal = Calendar.getInstance().apply { time = txDate }
+                    val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
+                    if (!onlyChecked || tx.isCheckedForMonth(mKey)) {
+                        balance += tx.amount
+                    }
+                }
+            }
+        }
+        return balance
+    }
+    /**
      * Calcule les intérêts du Livret A pour l'année en cours
      * Règle des quinzaines : 24 quinzaines par an.
      */
-    fun calculateLivretAInterests(account: Account, transactions: List<Transaction>, rate: Double): Double {
+    fun calculateLivretAInterests(
+        account: Account, 
+        transactions: List<Transaction>, 
+        rate: Double,
+        untilYear: Int? = null,
+        untilMonth: Int? = null,
+        onlyChecked: Boolean = true
+    ): Double {
         val now = Calendar.getInstance()
-        val currentYear = now.get(Calendar.YEAR)
+        val currentYear = untilYear ?: now.get(Calendar.YEAR)
         
         var totalInterests = 0.0
         val ratePerFortnight = (rate / 100.0) / 24.0
 
-        // On itère sur les 24 quinzaines de l'année
-        for (q in 0 until 24) {
+        val targetQuinzaineLimit = if (untilYear != null && untilMonth != null) {
+            (untilMonth + 1) * 2
+        } else 24
+
+        // On itère sur les quinzaines
+        for (q in 0 until targetQuinzaineLimit) {
             val month = q / 2
             val isSecondHalf = q % 2 == 1
             
-            // Calcul du solde à la fin de la quinzaine précédente
-            // (Pour la quinzaine n, on regarde l'impact des mouvements passés)
-            val balance = calculateBalanceAtFortnight(account, transactions, currentYear, month, isSecondHalf)
+            val balance = calculateBalanceAtFortnight(account, transactions, currentYear, month, isSecondHalf, onlyChecked)
             
             if (balance > 0) {
-                totalInterests += balance * ratePerFortnight
+                // Pour le projeté, on compte tout. Pour le réel, on s'arrête à aujourd'hui.
+                val fortnightDate = Calendar.getInstance().apply {
+                    set(currentYear, month, if (isSecondHalf) 16 else 1)
+                }
+                if (!onlyChecked || fortnightDate.before(now)) {
+                    totalInterests += balance * ratePerFortnight
+                }
             }
         }
         
@@ -226,7 +344,8 @@ class MainViewModel : ViewModel() {
         transactions: List<Transaction>,
         year: Int,
         month: Int,
-        isSecondHalf: Boolean
+        isSecondHalf: Boolean,
+        onlyChecked: Boolean
     ): Double {
         var balance = account.initialBalance
         
@@ -242,7 +361,7 @@ class MainViewModel : ViewModel() {
                 var iterCal = txCal.clone() as Calendar
                 while (iterCal.time.before(pivotDate)) {
                     val mKey = String.format(Locale.US, "%d-%02d", iterCal.get(Calendar.YEAR), iterCal.get(Calendar.MONTH) + 1)
-                    if (tx.isCheckedForMonth(mKey)) {
+                    if (!onlyChecked || tx.isCheckedForMonth(mKey)) {
                         val valDate = getValueDate(iterCal, tx.amount)
                         if (!valDate.after(pivotDate)) {
                             balance += tx.amount
@@ -252,9 +371,13 @@ class MainViewModel : ViewModel() {
                     if (tx.endDate != null && iterCal.time.after(tx.endDate.toDate())) break
                 }
             } else {
-                val valDate = getValueDate(Calendar.getInstance().apply { time = tx.date.toDate() }, tx.amount)
-                if (!valDate.after(pivotDate)) {
-                    balance += tx.amount
+                val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
+                val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
+                if (!onlyChecked || tx.isCheckedForMonth(mKey)) {
+                    val valDate = getValueDate(txCal, tx.amount)
+                    if (!valDate.after(pivotDate)) {
+                        balance += tx.amount
+                    }
                 }
             }
         }
@@ -404,6 +527,8 @@ class MainViewModel : ViewModel() {
         val currentMonth = now.get(Calendar.MONTH)
         val targetIndex = currentYear * 12 + currentMonth
         
+        val isCrypto = account.type == "CRYPTO"
+
         total += transactions.sumOf { tx ->
             val txDate = tx.date.toDate()
             val txCal = Calendar.getInstance().apply { time = txDate }
@@ -418,24 +543,34 @@ class MainViewModel : ViewModel() {
                 val effectiveEndIndex = minOf(targetIndex, endIndex - 1)
 
                 if (startIndex <= effectiveEndIndex) {
-                    tx.checkedMonths.count { mKey ->
-                        try {
-                            val parts = mKey.split("-")
-                            val y = parts[0].toInt()
-                            val m = parts[1].toInt() - 1
-                            val mIndex = y * 12 + m
-                            mIndex in startIndex..effectiveEndIndex
-                        } catch (e: Exception) {
-                            false
-                        }
-                    } * tx.amount
+                    if (isCrypto) {
+                        // Pour la crypto, on compte toutes les occurrences passées automatiquement
+                        val count = (effectiveEndIndex - startIndex + 1).coerceAtLeast(0)
+                        count * tx.amount
+                    } else {
+                        tx.checkedMonths.count { mKey ->
+                            try {
+                                val parts = mKey.split("-")
+                                val y = parts[0].toInt()
+                                val m = parts[1].toInt() - 1
+                                val mIndex = y * 12 + m
+                                mIndex in startIndex..effectiveEndIndex
+                            } catch (e: Exception) {
+                                false
+                            }
+                        } * tx.amount
+                    }
                 } else {
                     0.0
                 }
             } else {
                 if (startIndex <= targetIndex) {
-                    val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
-                    if (tx.isCheckedForMonth(mKey)) tx.amount else 0.0
+                    if (isCrypto) {
+                        tx.amount
+                    } else {
+                        val mKey = String.format(Locale.US, "%d-%02d", txCal.get(Calendar.YEAR), txCal.get(Calendar.MONTH) + 1)
+                        if (tx.isCheckedForMonth(mKey)) tx.amount else 0.0
+                    }
                 } else {
                     0.0
                 }
@@ -487,11 +622,14 @@ class MainViewModel : ViewModel() {
         color: String,
         linkedAccountId: String? = null,
         cryptoSymbol: String? = null,
+        initialInvestmentEur: Double? = null,
+        savingsRate: Double? = null, // Nouveau
         onAccountCreated: (String) -> Unit = {}
     ) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
             try {
+                Log.d("ADD_ACCOUNT", "Tentative d'ajout du compte: $name ($type)")
                 val currentState = _uiState.value
                 val nextOrder = if (currentState is AccountsUiState.Success) currentState.accounts.size else 0
                 val membersList = mutableListOf(currentUser.uid)
@@ -509,12 +647,17 @@ class MainViewModel : ViewModel() {
                     members = membersList,
                     ownerId = currentUser.uid,
                     linkedAccountId = linkedAccountId,
-                    cryptoSymbol = cryptoSymbol
+                    cryptoSymbol = cryptoSymbol,
+                    initialInvestmentEur = initialInvestmentEur,
+                    savingsRate = savingsRate
                 )
 
                 newAccountRef.set(account).await()
+                Log.d("ADD_ACCOUNT", "Compte créé avec succès: ${newAccountRef.id}")
                 onAccountCreated(account.id)
-            } catch (e: Exception) { }
+            } catch (e: Exception) { 
+                Log.e("ADD_ACCOUNT", "Erreur lors de la création du compte", e)
+            }
         }
     }
 
@@ -528,10 +671,13 @@ class MainViewModel : ViewModel() {
         color: String,
         linkedAccountId: String? = null,
         cryptoSymbol: String? = null,
+        initialInvestmentEur: Double? = null,
+        savingsRate: Double? = null, // Nouveau
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             try {
+                Log.d("UPDATE_ACCOUNT", "Mise à jour du compte: $accountId")
                 val updates = mutableMapOf<String, Any?>(
                     "name" to name,
                     "bankName" to bankName,
@@ -540,11 +686,16 @@ class MainViewModel : ViewModel() {
                     "isJoint" to isJoint,
                     "color" to color,
                     "linkedAccountId" to linkedAccountId,
-                    "cryptoSymbol" to cryptoSymbol
+                    "cryptoSymbol" to cryptoSymbol,
+                    "initialInvestmentEur" to initialInvestmentEur,
+                    "savingsRate" to savingsRate
                 )
                 firestore.collection("accounts").document(accountId).update(updates).await()
+                Log.d("UPDATE_ACCOUNT", "Compte mis à jour avec succès")
                 onSuccess()
-            } catch (e: Exception) { }
+            } catch (e: Exception) { 
+                Log.e("UPDATE_ACCOUNT", "Erreur lors de la mise à jour", e)
+            }
         }
     }
 
@@ -694,13 +845,18 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun calculateTotalInvestment(transactions: List<Transaction>): Double {
-        var total = 0.0
+    fun calculateTotalInvestment(account: Account, transactions: List<Transaction>, referencePrice: Double = 0.0): Double {
+        var total = account.initialInvestmentEur ?: (account.initialBalance * referencePrice)
         val now = Calendar.getInstance()
         val currentMonthIndex = now.get(Calendar.YEAR) * 12 + now.get(Calendar.MONTH)
 
-        transactions.filter { it.type == "INCOME" || (it.type == "TRANSFER" && it.amount > 0) }.forEach { tx ->
-            val cost = tx.investmentEur ?: 0.0
+        transactions.forEach { tx ->
+            val fiatFlow = tx.investmentEur ?: 0.0
+            if (fiatFlow == 0.0) return@forEach
+            
+            val isMoneyIn = tx.type == "INCOME" || (tx.type == "TRANSFER" && tx.amount > 0)
+            val factor = if (isMoneyIn) 1.0 else -1.0
+
             val txCal = Calendar.getInstance().apply { time = tx.date.toDate() }
             val startIndex = txCal.get(Calendar.YEAR) * 12 + txCal.get(Calendar.MONTH)
 
@@ -712,19 +868,19 @@ class MainViewModel : ViewModel() {
                 val effectiveEndIndex = minOf(currentMonthIndex, endIndex - 1)
                 if (startIndex <= effectiveEndIndex) {
                     val count = (effectiveEndIndex - startIndex + 1).coerceAtLeast(0)
-                    total += cost * count
+                    total += (fiatFlow * factor * count)
                 }
             } else {
                 if (startIndex <= currentMonthIndex) {
-                    total += cost
+                    total += (fiatFlow * factor)
                 }
             }
         }
         return total
     }
 
-    fun calculatePortfolioPerformance(account: Account, transactions: List<Transaction>, currentRate: Double): Pair<Double, Double> {
-        val totalInvested = calculateTotalInvestment(transactions)
+    fun calculatePortfolioPerformance(account: Account, transactions: List<Transaction>, currentRate: Double, referencePrice: Double = 0.0): Pair<Double, Double> {
+        val totalInvested = calculateTotalInvestment(account, transactions, referencePrice)
         val currentQuantity = calculateCurrentRealBalance(account, transactions)
         val currentValue = currentQuantity * currentRate
         

@@ -35,6 +35,7 @@ fun AddTransactionBottomSheet(
     accounts: List<Account> = emptyList(),
     currentAccountId: String = "",
     categories: List<CategoryFamily> = emptyList(),
+    cryptoRates: Map<String, Double> = emptyMap(),
     onDismiss: () -> Unit,
     onSave: (
         title: String,
@@ -50,7 +51,7 @@ fun AddTransactionBottomSheet(
         sourceAccountId: String,
         targetAccountId: String?,
         investmentEur: Double?,
-        feesPercent: Double? // Nouveau paramètre
+        feesPercent: Double?
     ) -> Unit
 ) {
     var title by remember { mutableStateOf(initialTransaction?.title ?: "") }
@@ -97,9 +98,9 @@ fun AddTransactionBottomSheet(
     var expandedPayment by remember { mutableStateOf(false) }
 
     // --- GESTION DU VIREMENT ---
-    var targetAccountId by remember { mutableStateOf<String?>(null) }
+    var targetAccountId by remember { mutableStateOf<String?>(initialTransaction?.targetAccountId) }
     var expandedTargetAccount by remember { mutableStateOf(false) }
-    var isTransferIncoming by remember { mutableStateOf(false) }
+    var isTransferIncoming by remember { mutableStateOf(initialTransaction?.let { it.amount > 0 } ?: false) }
 
     val activity = LocalActivity.current
     val context = LocalContext.current
@@ -119,6 +120,29 @@ fun AddTransactionBottomSheet(
 
     var showExitConfirmation by remember { mutableStateOf(false) }
     val isDirty = title.isNotBlank() || (amountText.isNotBlank() && amountText != "0" && amountText != "0.0")
+
+    // --- LOGIQUE CRYPTO ---
+    val currentAccount = remember(currentAccountId, accounts) { accounts.find { it.id == currentAccountId } }
+    val targetAcc = remember(targetAccountId, accounts) { accounts.find { it.id == targetAccountId } }
+    val cryptoAccount = if (currentAccount?.type == "CRYPTO") currentAccount else if (targetAcc?.type == "CRYPTO") targetAcc else null
+    val isCryptoInvolved = cryptoAccount != null
+    val cryptoSymbol = cryptoAccount?.cryptoSymbol ?: "BTC"
+    val rate = cryptoRates[cryptoSymbol] ?: 0.0
+
+    // Auto-calcul
+    LaunchedEffect(amountText, investmentEurText, type) {
+        if (rate > 0 && type != "EXPENSE") {
+            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+            val invEur = investmentEurText.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+            // On ne calcule que si l'un est vide et l'autre non
+            if (amount != 0.0 && investmentEurText.isEmpty()) {
+                investmentEurText = "%.2f".format(Locale.US, amount * rate)
+            } else if (invEur != 0.0 && amountText.isEmpty()) {
+                amountText = "%.6f".format(Locale.US, invEur / rate)
+            }
+        }
+    }
 
     if (showExitConfirmation) {
         AlertDialog(
@@ -219,8 +243,8 @@ fun AddTransactionBottomSheet(
                     value = amountText,
                     onValueChange = { amountText = it },
                     label = { 
-                        val isCrypto = accounts.find { it.id == currentAccountId }?.type == "CRYPTO"
-                        Text(if (isCrypto) "Quantité (ex: 0.1)" else stringResource(R.string.tx_amount_hint)) 
+                        val isCurrentCrypto = currentAccount?.type == "CRYPTO"
+                        Text(if (isCurrentCrypto) "Quantité ($cryptoSymbol)" else stringResource(R.string.tx_amount_hint)) 
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
@@ -229,8 +253,7 @@ fun AddTransactionBottomSheet(
             }
 
             // --- CHAMP SPÉCIFIQUE CRYPTO (Montant en € et Frais) ---
-            val currentAccount = accounts.find { it.id == currentAccountId }
-            if (currentAccount?.type == "CRYPTO" && type != "EXPENSE") {
+            if (isCryptoInvolved && type != "EXPENSE") {
                 item {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
@@ -257,8 +280,8 @@ fun AddTransactionBottomSheet(
 
             if (type == "TRANSFER") {
                 item {
-                    val currentAccountName = accounts.find { it.id == currentAccountId }?.name ?: "Ce compte"
-                    val targetAccountName = accounts.find { it.id == targetAccountId }?.name ?: "Autre compte"
+                    val currentAccountName = currentAccount?.name ?: "Ce compte"
+                    val targetAccountName = targetAcc?.name ?: "Autre compte"
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -298,9 +321,8 @@ fun AddTransactionBottomSheet(
                         expanded = expandedTargetAccount,
                         onExpandedChange = { expandedTargetAccount = !expandedTargetAccount }
                     ) {
-                        val targetAccount = accounts.find { it.id == targetAccountId }
                         OutlinedTextField(
-                            value = targetAccount?.name ?: "",
+                            value = targetAcc?.name ?: "",
                             onValueChange = {},
                             readOnly = true,
                             label = { Text(stringResource(R.string.tx_target_account_label)) },
@@ -532,6 +554,8 @@ fun AddTransactionBottomSheet(
                 Button(
                     onClick = {
                         val rawAmount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val rawInvEur = investmentEurText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        
                         val finalAmount = if (type == "EXPENSE") -abs(rawAmount) else abs(rawAmount)
                         val finalFamily = when(type) {
                             "INCOME" -> context.getString(R.string.tx_income_family)
@@ -539,7 +563,7 @@ fun AddTransactionBottomSheet(
                             else -> familyCategory
                         }
 
-                        if (title.isNotBlank() && rawAmount != 0.0) {
+                        if (title.isNotBlank() && (rawAmount != 0.0 || rawInvEur != 0.0)) {
                             val safeEndDate = endDate
                             
                             // Déterminer source et destination selon le sens
@@ -559,7 +583,7 @@ fun AddTransactionBottomSheet(
                                 if (isRecurring && safeEndDate != null) Timestamp(safeEndDate) else null,
                                 finalSourceId,
                                 finalTargetId,
-                                investmentEurText.toDoubleOrNull(),
+                                if (rawInvEur != 0.0) rawInvEur else null,
                                 feesPercentText.toDoubleOrNull()
                             )
                             onDismiss()
