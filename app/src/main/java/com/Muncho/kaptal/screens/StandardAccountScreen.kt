@@ -441,6 +441,11 @@ fun StandardAccountScreen(
             onDismiss = { showAddSheet = false },
             onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                 if (type == "TRANSFER" && targetId != null) {
+                    val targetAcc = allAccounts.find { it.id == targetId }
+                    val currentAcc = allAccounts.find { it.id == account.id }
+                    val cryptoAcc = if (currentAcc?.type == "CRYPTO") currentAcc else if (targetAcc?.type == "CRYPTO") targetAcc else null
+                    val rate = cryptoAcc?.cryptoSymbol?.let { cryptoRates[it] }
+
                     detailViewModel.performTransfer(
                         sourceAccountId = sourceId,
                         targetAccountId = targetId,
@@ -451,7 +456,8 @@ fun StandardAccountScreen(
                         recurrenceInterval = recurrenceInterval,
                         endDate = endDate,
                         investmentEur = investmentEur,
-                        feesPercent = feesPercent
+                        feesPercent = feesPercent,
+                        cryptoRate = rate
                     )
                 } else {
                     val newTransaction = Transaction(
@@ -485,7 +491,26 @@ fun StandardAccountScreen(
             cryptoRates = cryptoRates,
             onDismiss = { transactionToEdit = null },
             onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
-                if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
+                if (type == "TRANSFER" && targetId != null) {
+                    val targetAcc = allAccounts.find { it.id == targetId }
+                    val currentAcc = allAccounts.find { it.id == account.id }
+                    val cryptoAcc = if (currentAcc?.type == "CRYPTO") currentAcc else if (targetAcc?.type == "CRYPTO") targetAcc else null
+                    val rateValue = cryptoAcc?.cryptoSymbol?.let { cryptoRates[it] }
+
+                    detailViewModel.performTransfer(
+                        sourceAccountId = sourceId,
+                        targetAccountId = targetId,
+                        amount = amount,
+                        title = title,
+                        date = date,
+                        isRecurring = isRecurring,
+                        recurrenceInterval = recurrenceInterval,
+                        endDate = endDate,
+                        investmentEur = investmentEur,
+                        feesPercent = feesPercent,
+                        cryptoRate = rateValue
+                    )
+                } else if (transaction.isRecurring && effectiveDate != null && scope != RecurrenceEditScope.ALL) {
                     detailViewModel.updateRecurringTransactionWithScope(
                         accountId = account.id,
                         oldTransaction = transaction,
@@ -568,6 +593,31 @@ fun MonthPageContent(
         computeCumulativeBalance(account, initialBalance, transactions, year, month, onlyChecked = false, mainViewModel = mainViewModel)
     }
 
+    val dailyYields = remember(account, transactions, year, month) {
+        if (account.type == "SAVINGS_DAILY" && (account.savingsRate ?: 0.0) > 0.0) {
+            val list = mutableListOf<Pair<Date, Double>>()
+            val cal = Calendar.getInstance().apply {
+                set(year, month, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            val today = Calendar.getInstance()
+            
+            val dailyRate = (account.savingsRate!! / 100.0) / 365.0
+            
+            for (day in 1..daysInMonth) {
+                cal.set(Calendar.DAY_OF_MONTH, day)
+                if (cal.after(today)) break
+                
+                val balance = mainViewModel.calculateBalanceAtDate(account, transactions, cal.time, onlyChecked = true)
+                if (balance > 0) {
+                    list.add(cal.time to (balance * dailyRate))
+                }
+            }
+            list.sortedByDescending { it.first }
+        } else emptyList()
+    }
+
     val positiveColor = Color(0xFF2E7D32)
     val negativeColor = Color(0xFFC62828)
 
@@ -644,7 +694,7 @@ fun MonthPageContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (monthTransactions.isEmpty()) {
+        if (monthTransactions.isEmpty() && dailyYields.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -660,6 +710,12 @@ fun MonthPageContent(
                     .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                if (dailyYields.isNotEmpty()) {
+                    items(items = dailyYields, key = { "yield_${it.first.time}" }) { (date, amount) ->
+                        YieldItem(date = date, amount = amount)
+                    }
+                }
+
                 items(
                     items = monthTransactions,
                     key = { tx -> "${tx.id}_${tx.date.seconds}_$monthKey" }
@@ -788,6 +844,67 @@ fun ProjectionCurve(points: List<Float>) {
 
 
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun YieldItem(date: Date, amount: Double) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.85f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Date
+                Box(modifier = Modifier.width(36.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = SimpleDateFormat("dd", Locale.FRANCE).format(date),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Icon orange % +
+                Surface(
+                    color = Color(0xFFFF9800).copy(alpha = 0.9f),
+                    shape = CircleShape,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("%", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(10.dp).align(Alignment.BottomEnd).padding(end = 2.dp, bottom = 2.dp)
+                        )
+                    }
+                }
+
+                // Titre
+                Column {
+                    Text("Rendement net", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        SimpleDateFormat("HH:mm", Locale.FRANCE).format(date).let { if (it == "00:00") "03:15" else it }, // Simulation de l'heure comme dans la capture
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            Text(
+                text = "+ %.2f €".format(amount),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2E7D32)
+            )
+        }
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionItem(

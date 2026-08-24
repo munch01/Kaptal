@@ -259,6 +259,11 @@ fun CryptoScreen(
                 onDismiss = { showAddSheet = false },
                 onSave = { title, amount, familyCategory, subCategory, type, paymentMethod, date, isRecurring, recurrenceInterval, endDate, sourceId, targetId, investmentEur, feesPercent ->
                     if (type == "TRANSFER" && targetId != null) {
+                        val targetAcc = allAccounts.find { it.id == targetId }
+                        val currentAcc = allAccounts.find { it.id == account.id }
+                        val cryptoAcc = if (currentAcc?.type == "CRYPTO") currentAcc else if (targetAcc?.type == "CRYPTO") targetAcc else null
+                        val rateValue = cryptoAcc?.cryptoSymbol?.let { cryptoRates[it] }
+
                         detailViewModel.performTransfer(
                             sourceAccountId = sourceId,
                             targetAccountId = targetId,
@@ -269,7 +274,8 @@ fun CryptoScreen(
                             recurrenceInterval = recurrenceInterval,
                             endDate = endDate,
                             investmentEur = investmentEur,
-                            feesPercent = feesPercent
+                            feesPercent = feesPercent,
+                            cryptoRate = rateValue
                         )
                     } else {
                         val newTransaction = Transaction(

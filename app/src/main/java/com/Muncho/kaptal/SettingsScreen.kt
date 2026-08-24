@@ -46,6 +46,19 @@ fun SettingsScreen(
     val context = LocalContext.current
     val currentUser = viewModel.currentUser
 
+    val packageInfo = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    val appVersion = remember(packageInfo) {
+        if (packageInfo != null) {
+            "${packageInfo.versionName} (${packageInfo.versionCode})"
+        } else "1.0.123"
+    }
+
     // Dialogues
     var showEmailDialog by remember { mutableStateOf(false) }
     var showCurrencyDialog by remember { mutableStateOf(false) }
@@ -358,7 +371,7 @@ fun SettingsScreen(
                         SettingsClickableItem(
                             icon = Icons.Default.Info,
                             title = stringResource(R.string.settings_about_title),
-                            subtitle = stringResource(R.string.settings_version, "1.0.120"),
+                            subtitle = stringResource(R.string.settings_version, appVersion),
                             onClick = { showAboutDialog = true }
                         )
                     }
@@ -545,7 +558,7 @@ fun SettingsScreen(
                 Column {
                     Text(stringResource(R.string.settings_about_description))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(stringResource(R.string.settings_version, "1.0.120"), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_version, appVersion), fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.settings_about_tech))
                 }
             },

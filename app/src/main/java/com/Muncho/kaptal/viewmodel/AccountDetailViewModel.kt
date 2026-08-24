@@ -127,10 +127,16 @@ class AccountDetailViewModel : ViewModel() {
 
                 // 2. Si c'est un virement, mettre à jour l'autre côté
                 if (!transaction.transferGroupId.isNullOrBlank() && !transaction.targetAccountId.isNullOrBlank()) {
+                    val otherAccountId = transaction.targetAccountId
                     val otherAccountRef = db.collection("accounts")
-                        .document(transaction.targetAccountId)
+                        .document(otherAccountId)
                         .collection("transactions")
                     
+                    val otherAccountDoc = db.collection("accounts").document(otherAccountId).get().await()
+                    val otherIsCrypto = otherAccountDoc.getString("type") == "CRYPTO"
+                    val currentAccountDoc = db.collection("accounts").document(accountId).get().await()
+                    val currentIsCrypto = currentAccountDoc.getString("type") == "CRYPTO"
+
                     val otherTxSnapshot = otherAccountRef
                         .whereEqualTo("transferGroupId", transaction.transferGroupId)
                         .get()
@@ -140,9 +146,22 @@ class AccountDetailViewModel : ViewModel() {
                         if (doc.id != transaction.id) {
                             val otherTx = doc.toObject(Transaction::class.java)
                             if (otherTx != null) {
+                                // Calcul du nouveau montant pour l'autre côté
+                                val newOtherAmount = if (currentIsCrypto && !otherIsCrypto) {
+                                    // On vient de la crypto vers le FIAT -> Utiliser investmentEur
+                                    abs(transaction.investmentEur ?: transaction.amount)
+                                } else if (!currentIsCrypto && otherIsCrypto) {
+                                    // On vient du FIAT vers la crypto -> Garder l'ancienne quantité crypto ou recalculer ?
+                                    // Pour éviter le chiffre aléatoire, on garde l'ancienne quantité si l'unité change
+                                    otherTx.amount 
+                                } else {
+                                    // Même type (EUR -> EUR) -> Inversion simple
+                                    -transaction.amount
+                                }
+
                                 val updatedOtherTx = otherTx.copy(
                                     title = transaction.title,
-                                    amount = -transaction.amount, // Inverser le montant
+                                    amount = newOtherAmount,
                                     date = transaction.date,
                                     isRecurring = transaction.isRecurring,
                                     recurrenceInterval = transaction.recurrenceInterval,
@@ -171,7 +190,8 @@ class AccountDetailViewModel : ViewModel() {
         recurrenceInterval: String?,
         endDate: Timestamp?,
         investmentEur: Double? = null,
-        feesPercent: Double? = null
+        feesPercent: Double? = null,
+        cryptoRate: Double? = null // Nouveau paramètre
     ) {
         viewModelScope.launch {
             try {
@@ -181,14 +201,30 @@ class AccountDetailViewModel : ViewModel() {
                 val sourceIsCrypto = sourceAccDoc.getString("type") == "CRYPTO"
                 val targetIsCrypto = targetAccDoc.getString("type") == "CRYPTO"
                 
-                val absAmount = abs(amount)
+                val absSaisi = abs(amount)
                 val transferGroupId = UUID.randomUUID().toString()
                 
-                // Si on a un investissement EUR et qu'un des comptes est crypto, on l'utilise pour le côté FIAT.
-                val fiatVal = investmentEur ?: absAmount
-                
-                val sourceVal = if (sourceIsCrypto) absAmount else fiatVal
-                val targetVal = if (targetIsCrypto) absAmount else fiatVal
+                val rate = cryptoRate ?: 1.0
+
+                // Détermination des montants pour chaque côté
+                val (sourceVal, targetVal, fiatVal) = when {
+                    sourceIsCrypto && !targetIsCrypto -> {
+                        // Crypto -> FIAT (Vente)
+                        val btcQty = absSaisi
+                        val eurVal = investmentEur ?: (btcQty * rate)
+                        Triple(btcQty, eurVal, eurVal)
+                    }
+                    !sourceIsCrypto && targetIsCrypto -> {
+                        // FIAT -> Crypto (Achat)
+                        val eurVal = absSaisi
+                        val btcQty = investmentEur?.let { if (rate > 0) it / rate else 0.0 } ?: (eurVal / rate)
+                        Triple(eurVal, btcQty, eurVal)
+                    }
+                    else -> {
+                        // Même type (EUR -> EUR)
+                        Triple(absSaisi, absSaisi, investmentEur ?: absSaisi)
+                    }
+                }
 
                 // 1. Transaction sortante (débit)
                 val outTx = Transaction(

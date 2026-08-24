@@ -129,17 +129,31 @@ fun AddTransactionBottomSheet(
     val cryptoSymbol = cryptoAccount?.cryptoSymbol ?: "BTC"
     val rate = cryptoRates[cryptoSymbol] ?: 0.0
 
-    // Auto-calcul
-    LaunchedEffect(amountText, investmentEurText, type) {
-        if (rate > 0 && type != "EXPENSE") {
-            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
-            val invEur = investmentEurText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    // Gestion intelligente des champs : on ne veut pas d'écrasement automatique pendant que l'utilisateur tape
+    var isManuallyEditingAmount by remember { mutableStateOf(false) }
+    var isManuallyEditingInvestment by remember { mutableStateOf(false) }
 
-            // On ne calcule que si l'un est vide et l'autre non
-            if (amount != 0.0 && investmentEurText.isEmpty()) {
-                investmentEurText = "%.2f".format(Locale.US, amount * rate)
-            } else if (invEur != 0.0 && amountText.isEmpty()) {
-                amountText = "%.6f".format(Locale.US, invEur / rate)
+    if (rate > 0 && type != "EXPENSE") {
+        if (!isManuallyEditingInvestment && isManuallyEditingAmount) {
+            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+            val isCurrentCrypto = currentAccount?.type == "CRYPTO"
+            if (isCurrentCrypto) {
+                val calculated = amount * rate
+                if (calculated != 0.0) investmentEurText = "%.2f".format(Locale.US, calculated)
+            } else if (targetAcc?.type == "CRYPTO") {
+                // On est sur un compte EUR, le montant est en EUR
+                investmentEurText = amountText 
+            }
+        }
+        
+        if (!isManuallyEditingAmount && isManuallyEditingInvestment) {
+            val invEur = investmentEurText.replace(",", ".").toDoubleOrNull() ?: 0.0
+            val isCurrentCrypto = currentAccount?.type == "CRYPTO"
+            if (isCurrentCrypto) {
+                val calculated = invEur / rate
+                if (calculated != 0.0) amountText = "%.6f".format(Locale.US, calculated)
+            } else if (targetAcc?.type == "CRYPTO") {
+                amountText = investmentEurText
             }
         }
     }
@@ -241,7 +255,11 @@ fun AddTransactionBottomSheet(
             item {
                 OutlinedTextField(
                     value = amountText,
-                    onValueChange = { amountText = it },
+                    onValueChange = { 
+                        amountText = it
+                        isManuallyEditingAmount = true
+                        isManuallyEditingInvestment = false
+                    },
                     label = { 
                         val isCurrentCrypto = currentAccount?.type == "CRYPTO"
                         Text(if (isCurrentCrypto) "Quantité ($cryptoSymbol)" else stringResource(R.string.tx_amount_hint)) 
@@ -258,7 +276,11 @@ fun AddTransactionBottomSheet(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = investmentEurText,
-                            onValueChange = { investmentEurText = it },
+                            onValueChange = { 
+                                investmentEurText = it
+                                isManuallyEditingInvestment = true
+                                isManuallyEditingAmount = false
+                            },
                             label = { Text("Coût de l'achat (€)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.weight(1.5f),
@@ -556,7 +578,12 @@ fun AddTransactionBottomSheet(
                         val rawAmount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
                         val rawInvEur = investmentEurText.replace(",", ".").toDoubleOrNull() ?: 0.0
                         
-                        val finalAmount = if (type == "EXPENSE") -abs(rawAmount) else abs(rawAmount)
+                        val finalAmount = when(type) {
+                            "EXPENSE" -> -abs(rawAmount)
+                            "TRANSFER" -> if (isTransferIncoming) abs(rawAmount) else -abs(rawAmount)
+                            else -> abs(rawAmount)
+                        }
+                        
                         val finalFamily = when(type) {
                             "INCOME" -> context.getString(R.string.tx_income_family)
                             "TRANSFER" -> "Virement"

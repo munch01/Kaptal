@@ -266,7 +266,7 @@ class MainViewModel : ViewModel() {
         return list
     }
 
-    private fun calculateBalanceAtDate(account: Account, transactions: List<Transaction>, date: Date, onlyChecked: Boolean): Double {
+    fun calculateBalanceAtDate(account: Account, transactions: List<Transaction>, date: Date, onlyChecked: Boolean): Double {
         var balance = account.initialBalance
         val targetTime = date.time
         
