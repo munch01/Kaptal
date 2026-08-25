@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Kaptal"
-include(":app")
+include(":composeApp")
+// include(":app") // Désactivé pour la migration KMP
