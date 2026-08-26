@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 interface KmpSettings {
     fun putString(key: String, value: String)

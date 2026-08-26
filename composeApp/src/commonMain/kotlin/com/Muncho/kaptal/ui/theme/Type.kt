@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.ui.theme
+package com.muncho.kaptal.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable

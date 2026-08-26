@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize

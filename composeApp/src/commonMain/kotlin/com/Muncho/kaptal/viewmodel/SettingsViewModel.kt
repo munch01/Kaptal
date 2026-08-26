@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.viewmodel
+package com.muncho.kaptal.viewmodel
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -6,10 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.Muncho.kaptal.getSettings
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.model.CategoryFamily
-import com.Muncho.kaptal.model.getDefaultCategories
+import com.muncho.kaptal.getSettings
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.model.CategoryFamily
+import com.muncho.kaptal.model.getDefaultCategories
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.auth.auth
 import dev.gitlive.firebase.firestore.firestore

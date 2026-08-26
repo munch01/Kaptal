@@ -1,16 +1,21 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            onFilePickedCallback?.invoke(uri?.toString())
+        }
+
         // Initialisation des abstractions plateforme
         appContext = applicationContext
-        currentActivity = this as androidx.fragment.app.FragmentActivity // Si nécessaire pour la biométrie
+        currentActivity = this
         
         setContent {
             App()

@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import android.content.Intent
 import android.net.Uri
@@ -38,7 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.Muncho.kaptal.model.Account
+import com.muncho.kaptal.model.Account
 import kotlinx.coroutines.launch
 import java.util.Locale
 

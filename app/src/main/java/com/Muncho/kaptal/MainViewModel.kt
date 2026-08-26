@@ -1,11 +1,11 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.model.Transaction
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

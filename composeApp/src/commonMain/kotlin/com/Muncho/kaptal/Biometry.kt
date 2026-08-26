@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 interface BiometryManager {
     fun canAuthenticate(): Boolean

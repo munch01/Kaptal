@@ -1,7 +1,8 @@
-package com.Muncho.kaptal.utils
+package com.muncho.kaptal.utils
 
 import androidx.compose.ui.graphics.Color
 import kotlinx.datetime.*
+import kotlin.math.roundToInt
 
 fun getCategoryIndicatorColor(family: String?): Color {
     return when (family) {
@@ -35,7 +36,28 @@ fun getMonthName(year: Int, month: Int): String {
 }
 
 fun formatAmount(amount: Double): String {
-    // Basic formatting for KMP common
-    val rounded = (amount * 100).toLong() / 100.0
-    return "$rounded €"
+    // Format to 2 decimal places manually for KMP common
+    val rounded = (amount * 100).roundToInt() / 100.0
+    val parts = rounded.toString().split(".")
+    val integerPart = parts[0]
+    val decimalPart = if (parts.size > 1) parts[1].padEnd(2, '0').substring(0, 2) else "00"
+    return "$integerPart,$decimalPart €"
+}
+
+fun formatDecimal(value: Double, precision: Int): String {
+    val factor = 10.0.pow(precision)
+    val rounded = (value * factor).roundToInt() / factor
+    return rounded.toString().replace(".", ",")
+}
+
+private fun Double.pow(n: Int): Double {
+    var res = 1.0
+    repeat(n) { res *= this }
+    return res
+}
+
+fun Double.roundTo(decimals: Int): Double {
+    var multiplier = 1.0
+    repeat(decimals) { multiplier *= 10 }
+    return kotlin.math.round(this * multiplier) / multiplier
 }

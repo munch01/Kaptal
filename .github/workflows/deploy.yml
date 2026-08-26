@@ -43,6 +43,6 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.Muncho.kaptal
+          packageName: com.muncho.kaptal
           releaseFiles: ${{ steps.sign_app.outputs.signedReleaseFile }}
           tracks: internal

@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.utils
+package com.muncho.kaptal.utils
 
 import kotlinx.datetime.*
 
@@ -44,5 +44,37 @@ object DateTimeUtils {
     
     fun toEpochMilliseconds(instant: Instant): Long {
         return instant.toEpochMilliseconds()
+    }
+
+    fun formatDate(instant: Instant, pattern: String): String {
+        val dt = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+        return when (pattern) {
+            "dd/MM/yyyy" -> "${dt.dayOfMonth.toString().padStart(2, '0')}/${dt.monthNumber.toString().padStart(2, '0')}/${dt.year}"
+            "MMM yyyy" -> "${getMonthName(dt.monthNumber)} ${dt.year}"
+            else -> dt.toString()
+        }
+    }
+
+    fun startOfMonth(instant: Instant): Instant {
+        val dt = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+        return LocalDateTime(dt.year, dt.monthNumber, 1, 0, 0).toInstant(TimeZone.currentSystemDefault())
+    }
+
+    private fun getMonthName(month: Int): String {
+        return when (month) {
+            1 -> "Janv."
+            2 -> "Févr."
+            3 -> "Mars"
+            4 -> "Avr."
+            5 -> "Mai"
+            6 -> "Juin"
+            7 -> "Juil."
+            8 -> "Août"
+            9 -> "Sept."
+            10 -> "Oct."
+            11 -> "Nov."
+            12 -> "Déc."
+            else -> ""
+        }
     }
 }

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.Muncho.kaptal"
+    namespace = "com.muncho.kaptal"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.Muncho.kaptal"
+        applicationId = "com.muncho.kaptal"
         minSdk = 26
         targetSdk = 36
         versionCode = 124

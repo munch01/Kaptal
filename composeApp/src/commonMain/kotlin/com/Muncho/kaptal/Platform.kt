@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 interface Platform {
     val name: String
@@ -7,6 +7,8 @@ interface Platform {
     fun openUrl(url: String)
     fun openEmail(email: String, subject: String)
     fun exit()
+    fun pickDate(initialDate: Long, onDateSelected: (Long) -> Unit)
+    fun pickFile(type: String, onResult: (String?) -> Unit)
 }
 
 expect fun getPlatform(): Platform

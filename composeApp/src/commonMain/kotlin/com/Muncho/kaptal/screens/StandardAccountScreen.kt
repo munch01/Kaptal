@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -24,12 +24,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.model.Transaction
-import com.Muncho.kaptal.utils.*
-import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
-import com.Muncho.kaptal.viewmodel.MainViewModel
-import com.Muncho.kaptal.viewmodel.toInstant
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.model.Transaction
+import com.muncho.kaptal.utils.*
+import com.muncho.kaptal.viewmodel.AccountDetailViewModel
+import com.muncho.kaptal.viewmodel.MainViewModel
+import com.muncho.kaptal.viewmodel.toInstant
 import kotlinx.datetime.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -41,6 +41,7 @@ import kaptal.composeapp.generated.resources.*
 fun StandardAccountScreen(
     account: Account,
     allAccounts: List<Account> = emptyList(),
+    userCategories: List<com.muncho.kaptal.model.CategoryFamily> = emptyList(),
     initialPage: Int = 120,
     onPageChanged: (Int) -> Unit = {},
     onBackClick: () -> Unit,
@@ -48,7 +49,12 @@ fun StandardAccountScreen(
     detailViewModel: AccountDetailViewModel
 ) {
     val transactions by detailViewModel.transactions.collectAsState()
+    val cryptoRates by mainViewModel.cryptoRates.collectAsState()
     
+    var showAddSheet by remember { mutableStateOf(false) }
+    var showChartDialog by remember { mutableStateOf(false) }
+    var selectedTransaction by remember { mutableStateOf<Transaction?>(null) }
+
     LaunchedEffect(account.id) {
         detailViewModel.loadTransactions(account.id)
     }
@@ -97,8 +103,18 @@ fun StandardAccountScreen(
                             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         }
                     },
+                    actions = {
+                        IconButton(onClick = { showChartDialog = true }) {
+                            Icon(imageVector = Icons.Default.PieChart, contentDescription = null)
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
+            },
+            floatingActionButton = {
+                FloatingActionButton(onClick = { showAddSheet = true }) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                }
             }
         ) { paddingValues ->
             Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -118,10 +134,58 @@ fun StandardAccountScreen(
                         transactions = transactions,
                         onCheckedChange = { transactionId, monthKey, isChecked ->
                             detailViewModel.toggleTransactionCheck(account.id, transactionId, monthKey, isChecked)
+                        },
+                        onTransactionClick = {
+                            selectedTransaction = it
+                            showAddSheet = true
                         }
                     )
                 }
             }
+        }
+
+        if (showAddSheet) {
+            AddTransactionBottomSheet(
+                initialTransaction = selectedTransaction,
+                accounts = allAccounts,
+                currentAccountId = account.id,
+                categories = userCategories,
+                cryptoRates = cryptoRates,
+                onDismiss = { 
+                    showAddSheet = false
+                    selectedTransaction = null
+                },
+                onSave = { title, amount, family, sub, type, method, date, isRec, recInt, end, srcId, targetId, inv, fees ->
+                    if (selectedTransaction != null) {
+                        detailViewModel.updateTransaction(account.id, selectedTransaction!!.copy(
+                            title = title, amount = amount, familyCategory = family, subCategory = sub,
+                            type = type, paymentMethod = method, date = date, isRecurring = isRec,
+                            recurrenceInterval = recInt, endDate = end, investmentEur = inv, feesPercent = fees
+                        ))
+                    } else {
+                        if (type == "TRANSFER" && targetId != null) {
+                            detailViewModel.performTransfer(srcId, targetId, amount, title, date, isRec, recInt, end, inv, fees, cryptoRates[account.cryptoSymbol ?: ""])
+                        } else {
+                            detailViewModel.addTransaction(account.id, Transaction(
+                                title = title, amount = amount, familyCategory = family, subCategory = sub,
+                                type = type, paymentMethod = method, date = date, checkedMonths = emptyList(),
+                                isRecurring = isRec, recurrenceInterval = recInt, endDate = end, investmentEur = inv, feesPercent = fees
+                            ))
+                        }
+                    }
+                }
+            )
+        }
+
+        if (showChartDialog) {
+            val monthOffset = pagerState.currentPage - 120
+            val totalMonths = baseYear * 12 + baseMonth + monthOffset
+            CategoryDistributionDialog(
+                transactions = transactions,
+                year = totalMonths / 12,
+                month = totalMonths % 12,
+                onDismiss = { showChartDialog = false }
+            )
         }
     }
 }
@@ -132,7 +196,8 @@ fun MonthPageContent(
     year: Int,
     month: Int,
     transactions: List<Transaction>,
-    onCheckedChange: (String, String, Boolean) -> Unit
+    onCheckedChange: (String, String, Boolean) -> Unit,
+    onTransactionClick: (Transaction) -> Unit
 ) {
     val monthKey = "${year}-${(month + 1).toString().padStart(2, '0')}"
     
@@ -158,7 +223,7 @@ fun MonthPageContent(
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text(
-            text = getMonthName(year, month),
+            text = DateTimeUtils.formatDate(LocalDateTime(year, month + 1, 1, 0, 0).toInstant(TimeZone.currentSystemDefault()), "MMM yyyy"),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
@@ -170,7 +235,8 @@ fun MonthPageContent(
                 TransactionItem(
                     transaction = transaction,
                     isChecked = transaction.isCheckedForMonth(monthKey),
-                    onCheckedChange = { onCheckedChange(transaction.id, monthKey, it) }
+                    onCheckedChange = { onCheckedChange(transaction.id, monthKey, it) },
+                    onClick = { onTransactionClick(transaction) }
                 )
             }
         }
@@ -181,10 +247,11 @@ fun MonthPageContent(
 fun TransactionItem(
     transaction: Transaction,
     isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
     ) {
         Row(
@@ -213,10 +280,18 @@ fun TransactionItem(
             }
 
             Text(
-                text = formatAmount(transaction.amount),
+                text = "${transaction.amount.roundTo(2)} €",
                 fontWeight = FontWeight.Bold,
                 color = if (transaction.amount >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
             )
         }
     }
+}
+
+private fun dev.gitlive.firebase.firestore.Timestamp.toInstant(): Instant = Instant.fromEpochSeconds(this.seconds, this.nanoseconds)
+
+private fun Double.roundTo(decimals: Int): Double {
+    var multiplier = 1.0
+    repeat(decimals) { multiplier *= 10 }
+    return kotlin.math.round(this * multiplier) / multiplier
 }

@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,10 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.utils.parseHexColor
-import com.Muncho.kaptal.viewmodel.AccountsUiState
-import com.Muncho.kaptal.viewmodel.MainViewModel
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.utils.parseHexColor
+import com.muncho.kaptal.viewmodel.AccountsUiState
+import com.muncho.kaptal.viewmodel.MainViewModel
 import org.jetbrains.compose.resources.stringResource
 import kaptal.composeapp.generated.resources.Res
 import kaptal.composeapp.generated.resources.*

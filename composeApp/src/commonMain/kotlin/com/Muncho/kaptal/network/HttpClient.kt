@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.network
+package com.muncho.kaptal.network
 
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*

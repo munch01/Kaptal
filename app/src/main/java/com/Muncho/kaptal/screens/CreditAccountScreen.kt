@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import android.app.DatePickerDialog
 import android.widget.Toast
@@ -29,11 +29,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.Muncho.kaptal.MainViewModel
-import com.Muncho.kaptal.R
-import com.Muncho.kaptal.findActivity
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
+import com.muncho.kaptal.MainViewModel
+import com.muncho.kaptal.R
+import com.muncho.kaptal.findActivity
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.viewmodel.AccountDetailViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 

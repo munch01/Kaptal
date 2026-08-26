@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,11 +27,12 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.Muncho.kaptal.getPlatform
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.utils.parseHexColor
-import com.Muncho.kaptal.viewmodel.AccountsUiState
-import com.Muncho.kaptal.viewmodel.MainViewModel
+import com.muncho.kaptal.getPlatform
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.utils.parseHexColor
+import com.muncho.kaptal.utils.roundTo
+import com.muncho.kaptal.viewmodel.AccountsUiState
+import com.muncho.kaptal.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -56,7 +57,6 @@ fun HomeScreen(
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
 
-    var accountToDelete by remember { mutableStateOf<Account?>(null) }
     var draggingAccountId by remember { mutableStateOf<String?>(null) }
 
     Box(
@@ -138,100 +138,164 @@ fun HomeScreen(
                         }
                     }
                     is AccountsUiState.Success -> {
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxSize()
-                        ) { pageIndex ->
-                            val filteredAccounts = remember(state.accounts, pageIndex) {
-                                when (pageIndex) {
-                                    0 -> state.accounts.filter { it.type == "CHECKING" }
-                                    1 -> state.accounts.filter { 
-                                        it.type == "SAVINGS" || it.type == "LIVRET_A" || it.type == "SAVINGS_DAILY" || it.type == "BROKERAGE" 
+                        val totalNetWorth = remember(state.accounts, state.accountBalances, cryptoRates) {
+                            var total = 0.0
+                            state.accounts.forEach { account ->
+                                if (account.type == "CRYPTO") {
+                                    val qty = state.accountBalances[account.id] ?: account.initialBalance
+                                    val rate = cryptoRates[account.cryptoSymbol ?: "BTC"] ?: 0.0
+                                    total += qty * rate
+                                } else if (account.type != "CREDIT") {
+                                    total += state.accountBalances[account.id] ?: account.initialBalance
+                                }
+                            }
+                            total
+                        }
+
+                        val totalDebt = remember(state.creditRemainingDebts) {
+                            state.creditRemainingDebts.values.sum()
+                        }
+
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                                shape = RoundedCornerShape(24.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "PATRIMOINE NET ESTIMÉ",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.Gray,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${(totalNetWorth - totalDebt).roundTo(2)} $selectedCurrency",
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Actifs", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            Text("${totalNetWorth.roundTo(2)} $selectedCurrency", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                        }
+                                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.LightGray))
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Dettes", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                            Text("${totalDebt.roundTo(2)} $selectedCurrency", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                                        }
                                     }
-                                    2 -> state.accounts.filter { it.type == "CREDIT" }
-                                    else -> state.accounts.filter { it.type == "CRYPTO" }
-                                }.sortedBy { it.order }
+                                }
                             }
 
-                            if (filteredAccounts.isEmpty()) {
-                                Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                    Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(stringResource(Res.string.home_no_accounts), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline)
+                            HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxSize().weight(1f)
+                            ) { pageIndex ->
+                                val filteredAccounts = remember(state.accounts, pageIndex) {
+                                    when (pageIndex) {
+                                        0 -> state.accounts.filter { it.type == "CHECKING" }
+                                        1 -> state.accounts.filter { 
+                                            it.type == "SAVINGS" || it.type == "LIVRET_A" || it.type == "SAVINGS_DAILY" || it.type == "BROKERAGE" 
+                                        }
+                                        2 -> state.accounts.filter { it.type == "CREDIT" }
+                                        else -> state.accounts.filter { it.type == "CRYPTO" }
+                                    }.sortedBy { it.order }
                                 }
-                            } else {
-                                var accountsList by remember(filteredAccounts) {
-                                    mutableStateOf(filteredAccounts.sortedBy { it.order })
-                                }
-                                val listState = rememberLazyListState()
 
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp)
-                                ) {
-                                    items(items = accountsList, key = { account -> account.id }) { account ->
-                                        val realBalance = state.accountBalances[account.id] ?: account.initialBalance
-                                        val remainingDebt = state.creditRemainingDebts[account.id] ?: 0.0
+                                if (filteredAccounts.isEmpty()) {
+                                    Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                        Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.outline)
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(stringResource(Res.string.home_no_accounts), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.outline)
+                                    }
+                                } else {
+                                    var accountsList by remember(filteredAccounts) {
+                                        mutableStateOf(filteredAccounts.sortedBy { it.order })
+                                    }
+                                    val listState = rememberLazyListState()
 
-                                        AccountCard(
-                                            account = account,
-                                            currentBalance = realBalance,
-                                            remainingDebt = remainingDebt,
-                                            currency = selectedCurrency,
-                                            cryptoRates = cryptoRates,
-                                            onClick = { onAccountClick(account) },
-                                            modifier = Modifier
-                                                .animateItem()
-                                                .graphicsLayer {
-                                                    if (draggingAccountId == account.id) {
-                                                        scaleX = 1.05f
-                                                        scaleY = 1.05f
-                                                        alpha = 0.9f
+                                    LazyColumn(
+                                        state = listState,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp)
+                                    ) {
+                                        items(items = accountsList, key = { account -> account.id }) { account ->
+                                            val realBalance = state.accountBalances[account.id] ?: account.initialBalance
+                                            val remainingDebt = state.creditRemainingDebts[account.id] ?: 0.0
+
+                                            AccountCard(
+                                                account = account,
+                                                currentBalance = realBalance,
+                                                remainingDebt = remainingDebt,
+                                                currency = selectedCurrency,
+                                                cryptoRates = cryptoRates,
+                                                onClick = { onAccountClick(account) },
+                                                modifier = Modifier
+                                                    .animateItem()
+                                                    .graphicsLayer {
+                                                        if (draggingAccountId == account.id) {
+                                                            scaleX = 1.05f
+                                                            scaleY = 1.05f
+                                                            alpha = 0.9f
+                                                        }
                                                     }
-                                                }
-                                                .pointerInput(accountsList) {
-                                                    var verticalOffset = 0f
-                                                    detectDragGesturesAfterLongPress(
-                                                        onDragStart = { 
-                                                            draggingAccountId = account.id
-                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        },
-                                                        onDragEnd = { 
-                                                            draggingAccountId = null
-                                                            viewModel.updateAccountsOrder(accountsList) 
-                                                        },
-                                                        onDragCancel = { 
-                                                            draggingAccountId = null
-                                                            viewModel.updateAccountsOrder(accountsList) 
-                                                        },
-                                                        onDrag = { change, dragAmount ->
-                                                            change.consume()
-                                                            verticalOffset += dragAmount.y
-                                                            val threshold = 180f 
-                                                            if (verticalOffset > threshold) {
-                                                                val currentIndex = accountsList.indexOf(account)
-                                                                if (currentIndex < accountsList.size - 1) {
-                                                                    accountsList = accountsList.toMutableList().apply {
-                                                                        add(currentIndex + 1, removeAt(currentIndex))
+                                                    .pointerInput(accountsList) {
+                                                        var verticalOffset = 0f
+                                                        detectDragGesturesAfterLongPress(
+                                                            onDragStart = { 
+                                                                draggingAccountId = account.id
+                                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            },
+                                                            onDragEnd = { 
+                                                                draggingAccountId = null
+                                                                viewModel.updateAccountsOrder(accountsList) 
+                                                            },
+                                                            onDragCancel = { 
+                                                                draggingAccountId = null
+                                                                viewModel.updateAccountsOrder(accountsList) 
+                                                            },
+                                                            onDrag = { change, dragAmount ->
+                                                                change.consume()
+                                                                verticalOffset += dragAmount.y
+                                                                val threshold = 180f 
+                                                                if (verticalOffset > threshold) {
+                                                                    val currentIndex = accountsList.indexOf(account)
+                                                                    if (currentIndex < accountsList.size - 1) {
+                                                                        accountsList = accountsList.toMutableList().apply {
+                                                                            add(currentIndex + 1, removeAt(currentIndex))
+                                                                        }
+                                                                        verticalOffset = 0f
+                                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                                     }
-                                                                    verticalOffset = 0f
-                                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                                }
-                                                            } else if (verticalOffset < -threshold) {
-                                                                val currentIndex = accountsList.indexOf(account)
-                                                                if (currentIndex > 0) {
-                                                                    accountsList = accountsList.toMutableList().apply {
-                                                                        add(currentIndex - 1, removeAt(currentIndex))
+                                                                } else if (verticalOffset < -threshold) {
+                                                                    val currentIndex = accountsList.indexOf(account)
+                                                                    if (currentIndex > 0) {
+                                                                        accountsList = accountsList.toMutableList().apply {
+                                                                            add(currentIndex - 1, removeAt(currentIndex))
+                                                                        }
+                                                                        verticalOffset = 0f
+                                                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                                     }
-                                                                    verticalOffset = 0f
-                                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                                 }
                                                             }
-                                                        }
-                                                    )
-                                                }
-                                        )
+                                                        )
+                                                    }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -314,21 +378,6 @@ fun HomeScreen(
             }
         }
     }
-
-    accountToDelete?.let { account ->
-        AlertDialog(
-            onDismissRequest = { accountToDelete = null },
-            title = { Text(stringResource(Res.string.account_delete_confirm_title)) },
-            text = { Text(stringResource(Res.string.account_delete_confirm_text, account.name)) },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    onClick = { viewModel.deleteAccount(account.id); accountToDelete = null }
-                ) { Text(stringResource(Res.string.delete_label)) }
-            },
-            dismissButton = { TextButton(onClick = { accountToDelete = null }) { Text(stringResource(Res.string.cancel_label)) } }
-        )
-    }
 }
 
 @Composable
@@ -407,7 +456,7 @@ fun AccountCard(
                 if (account.type == "CRYPTO") {
                     val cryptoSymbol = account.cryptoSymbol ?: "BTC" 
                     Text(
-                        text = "${currentBalance} ${cryptoSymbol}",
+                        text = "${currentBalance.roundTo(4)} ${cryptoSymbol}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = balanceColor
@@ -415,7 +464,7 @@ fun AccountCard(
                     val rate = cryptoRates[cryptoSymbol] ?: 0.0
                     val estimatedEuro = currentBalance * rate
                     Text(
-                        text = "≈ ${estimatedEuro} ${currency}",
+                        text = "≈ ${estimatedEuro.roundTo(2)} ${currency}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -426,14 +475,14 @@ fun AccountCard(
                         color = MaterialTheme.colorScheme.outline
                     )
                     Text(
-                        text = "${if (remainingDebt > 0) remainingDebt else 0.0} ${currency}",
+                        text = "${(if (remainingDebt > 0) remainingDebt else 0.0).roundTo(2)} ${currency}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
                 } else {
                     Text(
-                        text = "${currentBalance} ${currency}",
+                        text = "${currentBalance.roundTo(2)} ${currency}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = balanceColor

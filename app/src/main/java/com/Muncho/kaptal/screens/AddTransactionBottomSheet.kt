@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
@@ -17,12 +17,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.Muncho.kaptal.LocalActivity
-import com.Muncho.kaptal.R
-import com.Muncho.kaptal.findActivity
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.model.CategoryFamily
-import com.Muncho.kaptal.model.Transaction
+import com.muncho.kaptal.LocalActivity
+import com.muncho.kaptal.R
+import com.muncho.kaptal.findActivity
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.model.CategoryFamily
+import com.muncho.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
 import java.util.*

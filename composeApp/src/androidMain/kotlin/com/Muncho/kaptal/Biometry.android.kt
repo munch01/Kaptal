@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt

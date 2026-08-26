@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 class DesktopPlatform : Platform {
     override val name: String = "Desktop"
@@ -21,6 +21,10 @@ class DesktopPlatform : Platform {
 
     override fun exit() {
         System.exit(0)
+    }
+
+    override fun pickDate(initialDate: Long, onDateSelected: (Long) -> Unit) {
+        // Desktop implementation could use a custom dialog
     }
 }
 

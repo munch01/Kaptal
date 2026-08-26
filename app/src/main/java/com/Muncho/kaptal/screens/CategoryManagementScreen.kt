@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,9 +22,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.Muncho.kaptal.R
-import com.Muncho.kaptal.SettingsViewModel
-import com.Muncho.kaptal.model.CategoryFamily
+import com.muncho.kaptal.R
+import com.muncho.kaptal.SettingsViewModel
+import com.muncho.kaptal.model.CategoryFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

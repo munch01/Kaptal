@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.model
+package com.muncho.kaptal.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.Exclude

@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.ui.theme
+package com.muncho.kaptal.ui.theme
 
 import android.app.Activity
 import android.os.Build

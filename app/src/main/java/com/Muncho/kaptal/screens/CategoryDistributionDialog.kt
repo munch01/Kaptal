@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,8 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.Muncho.kaptal.R
-import com.Muncho.kaptal.model.Transaction
+import com.muncho.kaptal.R
+import com.muncho.kaptal.model.Transaction
 import java.text.SimpleDateFormat
 import java.util.*
 

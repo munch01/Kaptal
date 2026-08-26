@@ -1,14 +1,14 @@
-package com.Muncho.kaptal.viewmodel
+package com.muncho.kaptal.viewmodel
 
-import com.Muncho.kaptal.utils.PdfRow
-import com.Muncho.kaptal.utils.PdfTableExtractor
+import com.muncho.kaptal.utils.PdfRow
+import com.muncho.kaptal.utils.PdfTableExtractor
 import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.model.Transaction
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.model.Transaction
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration

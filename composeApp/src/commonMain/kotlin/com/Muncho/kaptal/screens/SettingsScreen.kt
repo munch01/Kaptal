@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,9 +21,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.Muncho.kaptal.getPlatform
-import com.Muncho.kaptal.model.Account
-import com.Muncho.kaptal.viewmodel.SettingsViewModel
+import com.muncho.kaptal.getPlatform
+import com.muncho.kaptal.model.Account
+import com.muncho.kaptal.viewmodel.SettingsViewModel
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kaptal.composeapp.generated.resources.Res

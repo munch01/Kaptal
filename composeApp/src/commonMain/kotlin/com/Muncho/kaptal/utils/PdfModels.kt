@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.utils
+package com.muncho.kaptal.utils
 
 import kotlinx.serialization.Serializable
 

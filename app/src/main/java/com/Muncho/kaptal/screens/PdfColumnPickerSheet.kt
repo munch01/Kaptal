@@ -1,4 +1,4 @@
-package com.Muncho.kaptal.screens
+package com.muncho.kaptal.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.Muncho.kaptal.utils.PdfRow
+import com.muncho.kaptal.utils.PdfRow
 
 enum class ColumnRole {
     DATE, AMOUNT, PRINCIPAL, INTEREST, INSURANCE, REMAINING_DEBT, NONE

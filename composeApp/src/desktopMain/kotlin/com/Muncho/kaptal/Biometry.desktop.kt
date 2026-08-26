@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 class DesktopBiometryManager : BiometryManager {
     override fun canAuthenticate(): Boolean = false // Pas de support natif direct simple ici

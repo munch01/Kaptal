@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import android.content.Context
 import android.os.Bundle
@@ -26,11 +26,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.Muncho.kaptal.screens.CategoryManagementScreen
-import com.Muncho.kaptal.screens.CreditAccountScreen
-import com.Muncho.kaptal.screens.CryptoScreen
-import com.Muncho.kaptal.screens.StandardAccountScreen
-import com.Muncho.kaptal.ui.theme.KaptalTheme
+import com.muncho.kaptal.screens.CategoryManagementScreen
+import com.muncho.kaptal.screens.CreditAccountScreen
+import com.muncho.kaptal.screens.CryptoScreen
+import com.muncho.kaptal.screens.StandardAccountScreen
+import com.muncho.kaptal.ui.theme.KaptalTheme
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType

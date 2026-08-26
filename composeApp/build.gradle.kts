@@ -58,6 +58,7 @@ kotlin {
         
         val androidMain by getting {
             dependencies {
+                implementation(libs.androidx.appcompat)
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.androidx.activity.compose)
                 implementation("androidx.biometric:biometric:1.1.0")
@@ -65,6 +66,7 @@ kotlin {
                 implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.1.2"))
                 implementation("com.google.firebase:firebase-auth-ktx")
                 implementation("com.google.firebase:firebase-firestore-ktx")
+                implementation("com.tom-roush:pdfbox-android:2.0.27.0")
             }
         }
         
@@ -92,13 +94,13 @@ kotlin {
 }
 
 android {
-    namespace = "com.Muncho.kaptal"
-    compileSdk = 36
+    namespace = "com.muncho.kaptal"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.kaptal"
+        applicationId = "com.Muncho.kaptal"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 3
         versionName = "2.0.0-portage"
     }

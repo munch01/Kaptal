@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import android.content.Context
 import android.util.Log
@@ -36,10 +36,32 @@ class AndroidPlatform(private val context: Context) : Platform {
     }
 
     override fun exit() {
-        (context as? android.app.Activity)?.finish()
+        currentActivity.finish()
+    }
+
+    override fun pickDate(initialDate: Long, onDateSelected: (Long) -> Unit) {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = initialDate }
+        android.app.DatePickerDialog(
+            currentActivity,
+            { _, year, month, day ->
+                val resultCal = java.util.Calendar.getInstance().apply {
+                    set(year, month, day)
+                }
+                onDateSelected(resultCal.timeInMillis)
+            },
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH),
+            cal.get(java.util.Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+    override fun pickFile(type: String, onResult: (String?) -> Unit) {
+        onFilePickedCallback = onResult
+        filePickerLauncher?.launch(type)
     }
 }
 
 lateinit var appContext: Context
+var filePickerLauncher: androidx.activity.result.ActivityResultLauncher<String>? = null
+var onFilePickedCallback: ((String?) -> Unit)? = null
 
 actual fun getPlatform(): Platform = AndroidPlatform(appContext)

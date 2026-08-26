@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.Muncho.kaptal.R
+import com.muncho.kaptal.R
 
 @Composable
 fun AuthScreen(

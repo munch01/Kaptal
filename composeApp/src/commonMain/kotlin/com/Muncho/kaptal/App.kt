@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -11,11 +11,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.Muncho.kaptal.screens.*
-import com.Muncho.kaptal.ui.theme.KaptalTheme
-import com.Muncho.kaptal.viewmodel.MainViewModel
-import com.Muncho.kaptal.viewmodel.SettingsViewModel
-import com.Muncho.kaptal.viewmodel.AccountDetailViewModel
+import com.muncho.kaptal.screens.*
+import com.muncho.kaptal.ui.theme.KaptalTheme
+import com.muncho.kaptal.viewmodel.MainViewModel
+import com.muncho.kaptal.viewmodel.SettingsViewModel
+import com.muncho.kaptal.viewmodel.AccountDetailViewModel
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.auth.auth
 
@@ -82,7 +82,14 @@ fun App() {
                 composable("settings") {
                     SettingsScreen(
                         onBackClick = { navController.popBackStack() },
-                        onNavigateToCategories = { /* navigate to categories */ },
+                        onNavigateToCategories = { navController.navigate("category_management") },
+                        viewModel = settingsViewModel
+                    )
+                }
+
+                composable("category_management") {
+                    CategoryManagementScreen(
+                        onBackClick = { navController.popBackStack() },
                         viewModel = settingsViewModel
                     )
                 }
@@ -93,18 +100,36 @@ fun App() {
                 ) { backStackEntry ->
                     val accountId = backStackEntry.arguments?.getString("accountId") ?: ""
                     val uiState by mainViewModel.uiState.collectAsState()
-                    val accounts = (uiState as? com.Muncho.kaptal.viewmodel.AccountsUiState.Success)?.accounts ?: emptyList()
+                    val accounts = (uiState as? com.muncho.kaptal.viewmodel.AccountsUiState.Success)?.accounts ?: emptyList()
                     val account = accounts.find { it.id == accountId }
                     val detailViewModel: AccountDetailViewModel = viewModel { AccountDetailViewModel() }
 
                     account?.let {
-                        StandardAccountScreen(
-                            account = it,
-                            allAccounts = accounts,
-                            onBackClick = { navController.popBackStack() },
-                            mainViewModel = mainViewModel,
-                            detailViewModel = detailViewModel
-                        )
+                        when (it.type) {
+                            "CREDIT" -> CreditAccountScreen(
+                                account = it,
+                                allAccounts = accounts,
+                                userCategories = settingsViewModel.userCategories,
+                                onBackClick = { navController.popBackStack() },
+                                mainViewModel = mainViewModel,
+                                detailViewModel = detailViewModel
+                            )
+                            "CRYPTO" -> CryptoScreen(
+                                account = it,
+                                userCategories = settingsViewModel.userCategories,
+                                onBackClick = { navController.popBackStack() },
+                                mainViewModel = mainViewModel,
+                                detailViewModel = detailViewModel
+                            )
+                            else -> StandardAccountScreen(
+                                account = it,
+                                allAccounts = accounts,
+                                userCategories = settingsViewModel.userCategories,
+                                onBackClick = { navController.popBackStack() },
+                                mainViewModel = mainViewModel,
+                                detailViewModel = detailViewModel
+                            )
+                        }
                     }
                 }
             }

@@ -1,4 +1,4 @@
-package com.Muncho.kaptal
+package com.muncho.kaptal
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.fragment.app.FragmentActivity
